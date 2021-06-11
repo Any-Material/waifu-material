@@ -81,7 +81,7 @@ It **removes** the result of a search term this prefix is appended from previous
 
 ## Grouping
 
-It's possible to grouping search terms by putting inside `()`, and groups can stack.<br>
+It's possible to bundle search terms by putting inside `()`, and groups can stack.<br>
 Computed result within a group affect outer result depends on group's prefix.<br>
 
 ## Examples

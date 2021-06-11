@@ -23,8 +23,8 @@ class Search {
 			// result
 			nozomi = {
 				array: {
-					local: new Array<number>(),
-					global: new Array<number>()
+					local: [] as number[],
+					global: [] as number[]
 				},
 				size: 0,
 				singular: is_SINGULAR()
@@ -74,7 +74,7 @@ class Search {
 				}
 				case Field.STATUS: {
 					if (value == "favorite") {
-						return Object.keys(favorite.get());
+						return Object.keys(favorite.get()).map((id) => Number(id));
 					}
 					// @ts-ignore
 					const status: TaskStatus | undefined = TaskStatus[value.toUpperCase()];
@@ -90,22 +90,21 @@ class Search {
 					if (!I.collection[URL]) {
 						await request.GET(URL, { headers: nozomi.singular ? { "range": `bytes=${index * per_page * 4}-${index * per_page * 4 + per_page * 4 - 1}` } : {} }, "binary").then((response) => {
 							switch (response.status.code) {
-								case 200: // full
-								case 206: // partitial
-									{
-										if (nozomi.singular) {
-											// full length
-											nozomi.size = Number((response.headers["content-range"]! as string).replace(/^bytes\s[0-9]+-[0-9]+\//, "")) / 4;
-											// return without save
-											return I.unknown_1(response);
-										}
-										I.collection[URL] = I.unknown_1(response);
-										break;
+								case 200:
+								case 206: {
+									if (nozomi.singular) {
+										// full length
+										nozomi.size = Number((response.headers["content-range"]! as string).replace(/^bytes\s[0-9]+-[0-9]+\//, "")) / 4;
+										// return without save
+										return I.unknown_1(response);
 									}
+									I.collection[URL] = I.unknown_1(response);
+									break;
+								}
 							}
 						});
 					}
-					return I.collection[URL];
+					return I.collection[URL] ?? [];
 				}
 			}
 		}

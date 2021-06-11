@@ -111,8 +111,8 @@ tag:uncensored -(type:manga -(language:korean))
 		"max_working": 5
 	}
 ```
-**Folder** 는 **GalleryBlock** 이 지원하는 모든 속성을 지원하며 해당 Gallery 의 대응하는 속성 값을 삽입 가능합니다.<br>
-다음은 Gallery#9(Eat The Rich!) 를 대상으로 **folder** 에 속성 값을 추가한 예시입니다.<br>
+**Folder** (은)는 **GalleryBlock** (이)가 지원하는 모든 속성을 지원하며 해당 Gallery 의 대응하는 속성 값을 삽입 가능합니다.<br>
+다음은 Gallery#9(Eat The Rich!) (을)를 대상으로 **folder** 에 속성 값을 추가한 예시입니다.<br>
 
 ```json
 {

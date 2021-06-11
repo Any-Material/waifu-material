@@ -155,7 +155,7 @@ class Read {
 		const offset = parseInt(match[1], 16);
 
 		if (!isNaN(offset)) {
-			return this.unknown_1(offset < 0x09 ? 1 : offset, offset < 0x30 ? 2 : 3) + subdomain;
+			return this.unknown_1(offset < 0x59 ? 1 : offset, offset < 0x80 ? 2 : 3) + subdomain;
 		}
 		return subdomain;
 	}
