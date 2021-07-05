@@ -1,7 +1,7 @@
 {
 	"name": "nozomi-material",
 	"main": "build/main.js",
-	"version": "1.1.3",
+	"version": "1.1.4",
 	"description": "あなたの望みを現実に",
 	"scripts": {
 		"serve": "node webpack/serve.js",
