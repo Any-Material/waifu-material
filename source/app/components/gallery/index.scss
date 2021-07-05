@@ -176,7 +176,7 @@
 			height: 50px;
 			transform: rotate(45deg);
 			color: var(--colour_1);
-			&.NONE {
+			&.default {
 				display: none;
 			}
 			&.QUEUED {
@@ -190,14 +190,14 @@
 			}
 		}
 	}
-	&.unset, &.buttons {
+	&.TITLE, &.BUTTONS {
 		#upper {
 			> #discovery {
 				transform: translateY(100%);
 			}
 		}
 	}
-	&.discovery {
+	&.INFORMATION {
 		#upper {
 			> [data-component="lazyload"] {
 				visibility: hidden;
@@ -213,7 +213,7 @@
 		> #upper {
 			border-color: var(--colour_9);
 		}
-		&.unset, &.buttons {
+		&.TITLE, &.BUTTONS {
 			> #upper {
 				> [data-component="lazyload"] {
 					opacity: 100%;

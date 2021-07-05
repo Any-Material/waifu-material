@@ -1,46 +1,49 @@
-import * as React from "react";
-
+// framework
+import React from "react";
+// style
 import "./index.scss";
-
+// components
 import TitleBar from "@/app/components/titlebar";
 import Overlay from "@/app/views/overlay";
 import Browser from "@/app/views/browser";
 import Viewer from "@/app/views/viewer";
+// states
+import navigation, { Viewport } from "@/states/navigation";
+// api
+import { BridgeEvent } from "@/api";
 
-import router from "@/statics/router";
+export interface AppProps extends Props {}
 
-import { BridgeEvent } from "@/common";
-import { StaticEvent } from "@/statics";
-import { Viewport } from "@/statics/router";
-
-export type AppProps = {};
-export type AppState = {
-	view: Viewport["view"],
-	terminal: boolean,
+export interface AppState {
+	view: Viewport;
+	terminal: boolean;
 	fullscreen: boolean;
-};
+}
 
-class App extends React.Component<AppProps, AppState> {
+export class App extends React.Component<AppProps, AppState> {
 	public props: AppProps;
 	public state: AppState;
+	
 	constructor(props: AppProps) {
 		super(props);
 		this.props = props;
-		this.state = { view: router.get().view, terminal: false, fullscreen: false };
-
-		window.static.on(StaticEvent.ROUTER, (args) => {
-			const [$new, $old] = args as [Viewport, Viewport];
-
-			this.setState({ ...this.state, view: $new.view });
-		});
-		window.bridge.on(BridgeEvent.ENTER_FULL_SCREEN, () => {
+		this.state = {
+			view: navigation.state.view,
+			terminal: false,
+			fullscreen: false
+		};
+		
+		window.bridge.handle(BridgeEvent.ENTER_FULL_SCREEN, () => {
 			this.setState({ ...this.state, fullscreen: true });
 		});
-		window.bridge.on(BridgeEvent.LEAVE_FULL_SCREEN, () => {
+		window.bridge.handle(BridgeEvent.LEAVE_FULL_SCREEN, () => {
 			this.setState({ ...this.state, fullscreen: false });
 		});
-		window.bridge.on(BridgeEvent.TOGGLE_TERMINAL, () => {
+		window.bridge.handle(BridgeEvent.TOGGLE_TERMINAL, () => {
 			this.setState({ ...this.state, terminal: !this.state.terminal });
+		});
+		navigation.handle((state) => {
+			this.setState({ ...this.state, view: state.after.view });
 		});
 	}
 	public render() {
@@ -48,12 +51,13 @@ class App extends React.Component<AppProps, AppState> {
 			<>
 				<TitleBar enable={!this.state.fullscreen}></TitleBar>
 				<section id="content" class="contrast">
-					<Browser enable={this.state.view === "browser"}></Browser>
-					<Viewer enable={this.state.view === "viewer"}></Viewer>
+					<Browser enable={this.state.view === Viewport.BROWSER}></Browser>
+					<Viewer enable={this.state.view === Viewport.VIEWER}></Viewer>
 					<Overlay enable={this.state.terminal}></Overlay>
 				</section>
 			</>
 		);
 	}
 }
+
 export default App;

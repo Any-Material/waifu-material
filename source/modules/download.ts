@@ -1,244 +1,222 @@
+// nodejs
 import * as node_fs from "fs";
 import * as node_path from "path";
-
-import scheme from "@/assets/scheme.json";
-
-import read from "@/modules/hitomi/read";
-import settings from "@/modules/settings";
-import storage from "@/modules/storage";
+// modules
 import request from "@/modules/request";
-import worker from "@/statics/worker";
+import settings from "@/modules/settings";
+import gallery, { GalleryBlock } from "@/modules/hitomi.la/gallery";
+// states
+import worker from "@/states/worker";
+// api
+import { BridgeEvent } from "@/api";
 
-import { BridgeEvent } from "@/common";
-import { StaticEvent } from "@/statics";
-import { PartialOptions, RequestProgress } from "@/modules/request";
-
-const config = settings.get().download;
-
-export enum TaskStatus {
-	NONE,
-	FINISHED,
-	WORKING,
-	QUEUED,
-	PAUSED,
-	ERROR
-};
-export class TaskFile {
-	public url: string;
-	public path: string;
-	public size: number;
-	public written: number;
-	constructor(url: string, path: string, size: number = NaN, written: number = 0) {
-		this.url = url;
-		this.path = path;
-		this.size = size;
-		this.written = written;
-	}
-}
-export class Task {
-	public id: number;
-	public from: string;
-	public title: string;
-	public files: TaskFile[];
-	public status: TaskStatus;
-	public options: PartialOptions;
-	public working: number;
-	public finished: number;
-	constructor(from: string, title: string, files: TaskFile[], options: PartialOptions = {}, id: number = Date.now()) {
-		this.id = id;
-		this.from = from;
-		this.title = title;
-		this.files = files;
-		this.status = TaskStatus.NONE;
-		this.options = options;
-		this.working = 0;
-		this.finished = 0;
-	}
-}
 export class Download {
-	public max_threads: number;
-	public max_working: number;
-	constructor(max_threads: number, max_working: number) {
-		this.max_threads = max_threads;
-		this.max_working = max_working;
-		window.static.on(StaticEvent.WORKER, (args) => {
-			const [$index, $new, $old] = args as [number, Task | undefined, Task | undefined];
-
-			if (storage.exist(String($index)) && $old) {
-				// first delete attempt
-				if (!$new) {
-					// delete
-					this.delete($index);
-				} else {
-					// update storage
-					storage.set_data(String($index), { ...$new });
-				}
+	constructor() {
+		if (node_fs.existsSync("./bundles")) {
+			for (const path of node_fs.readdirSync("./bundles")) {
+				// cache
+				const json = JSON.parse(node_fs.readFileSync(`./bundles/${path}`, "utf-8"));
+				//
+				// TaskFile contains special functions, however JSON doesn't
+				//
+				new Task({ ...json, files: json["files"].map((file: any) => {
+					return new TaskFile({ ...file });
+				})});
 			}
-		});
-		// if folder exists
-		if (node_fs.existsSync("bundles")) {
-			// loop files within
-			for (const file of node_fs.readdirSync("bundles")) {
-				// check if file is .json
-				if (node_fs.statSync(node_path.join("bundles", file)).isFile() && node_path.extname(file) === ".json") {
-					/*
-					0: name
-					1: extension
-					*/
-					const [ID] = file.split(/\./) as [string, string];
-					// register task from .json
-					storage.register(ID, node_path.join("bundles", file), "@import");
-					// create task from .json
-					const task = storage.get_data<Task>(ID);
-					// restart download
-					switch (task.status) {
-						case TaskStatus.NONE:
-						case TaskStatus.WORKING: {
-							this.create(task);
-							break;
-						}
-						default: {
-							worker.set(task.id, task);
-							break;
-						}
-					}
-				}
+			for (const task of Object.values(worker.state).filter((task) => { return task.status === TaskStatus.WORKING; }).take(settings.state.download.max_threads)) {
+				task.start();
 			}
 		}
 	}
-	public create(task: Task) {
-		const I = this;
-		return new Promise<TaskStatus>((resolve, reject) => {
-			const files: number[] = [];
-			// declare worker
-			worker.set(task.id, { ...task });
-			function update(key: keyof Task, value: Task[keyof Task]) {
-				if (!worker.get()[task.id]) {
-					return destroy();
-				}
-				// update task
-				task[key] = value as never;
-				// update worker
-				worker.set(task.id, { ...task });
+	public async folder(id: number) {
+		return new Promise<string>(async (resolve, reject) => {
+			//
+			// shortcut
+			//
+			if (worker.state[id]) {
+				return resolve(node_path.dirname(worker.state[id].files.first!.path));
 			}
-			function spawn(index: number): void {
-				// update
-				update("working", task.working + 1);
-				// generates directory recursively
-				node_fs.mkdirSync(node_path.dirname(task.files[files[index]].path), { recursive: true });
-				// create WriteStream
-				const writable = node_fs.createWriteStream(task.files[files[index]].path);
-				// make a request
-				request.GET(task.files[files[index]].url, { ...task.options, headers: { ...task.options.headers, ...task.files[files[index]].written ? { "content-range": `bytes=${task.files[files[index]].written}-` } : {} } }, "binary",
-					(chunk, progress) => {
-						// write file
-						writable.write(chunk);
-						// update
-						update("files", { ...task.files, [files[index]]: { ...task.files[files[index]], size: progress[RequestProgress.TOTAL_SIZE], written: task.files[files[index]].written + chunk.length } });
-					}).then(() => {
-						// stop writing
-						writable.end();
-						// update
-						update("finished", task.finished + 1);
+			const block = await gallery.block(id);
 
-						if (Boolean(files[task.working]) && task.working - task.finished < I.max_working) {
-							return spawn(task.working);
-						}
-						if (task.finished === files.length) {
-							// update
-							update("status", TaskStatus.FINISHED);
-							return destroy();
-						}
-					});
-				if (Boolean(files[task.working]) && task.working - task.finished < I.max_working) {
-					return spawn(task.working);
-				}
-			};
-			function destroy() {
-				// start queued task
-				if (task.status !== TaskStatus.QUEUED) {
-					for (const queued of Object.values(worker.get()).filter(($task) => { return $task.status === TaskStatus.QUEUED; })) {
-						I.create(queued);
-						break;
-					}
-				}
-				return resolve(task.status);
+			let folder = settings.state.download.placeholder;
+
+			for (const key of Object.keys(block)) {
+				folder = folder.replace(new RegExp(`{${key}}`), (block[key as keyof GalleryBlock] ?? `{${key}}`)?.toString());
 			}
-			window.bridge.on(BridgeEvent.BEFORE_CLOSE, () => {
-				// resolve anyways
-				return resolve(task.status);
-			});
-			// register storage
-			if (!storage.exist(String(task.id))) {
-				storage.register(String(task.id), node_path.join("bundles", String(task.id) + ".json"), { ...task });
-			}
-			// task counts reached its limit
-			if (this.max_threads <= Object.values(worker.get()).filter(($task) => { return $task.status === TaskStatus.WORKING; }).length) {
-				update("status", TaskStatus.QUEUED);
-				return destroy();
-			}
-			// scan unfinished files
-			for (let index = 0; index < task.files.length; index++) {
-				if (task.files[index].written !== task.files[index].size) {
-					files.push(index);
-				}
-			}
-			// task is finished
-			if (!files.length) {
-				update("status", TaskStatus.FINISHED);
-				return destroy();
-			}
-			// update
-			update("status", TaskStatus.WORKING);
-			update("working", task.finished);
-			// download recursivly
-			return spawn(0);
+			return resolve(folder);
 		});
 	}
-	public delete(id: number) {
-		return new Promise<void>((resolve, reject) => {
-			this.placeholder(id).then((folder) => {
-				// remove storage
-				storage.un_register(String(id));
-				// remove directory
-				node_fs.rmdirSync(node_path.join(config.directory, folder), { recursive: true });
-				// remove worker
-				worker.set(id, undefined);
-				// resolve
-				return resolve();
-			});
-		});
-	}
-	public placeholder(id: number) {
-		return new Promise<string>((resolve, reject) => {
-			read.block(id).then((block) => {
-				let hardcoded = config.folder;
+	public async download(id: number) {
+		return new Promise<void>(async (resolve, reject) => {
+			const script = await gallery.script(id);
+			const folder = await this.folder(id);
+			const files: Array<TaskFile> = [];
 	
-				for (const key of Object.keys(block)) {
-					// @ts-ignore
-					hardcoded = hardcoded.replace(`\{${key}\}`, block[key]);
-				}
-				return resolve(hardcoded.replace(/[\/:*?\"|<>]/g, ""));
-			});
+			for (const file of script.files) {
+				request.HEAD(file.url).then((response) => {
+					files.add(new TaskFile({
+						url: file.url,
+						path: node_path.join(settings.state.download.directory, folder, file.name),
+						size: Number(response.headers["content-length"])
+					}));
+					if (files.length === script.files.length) {
+						new Task({
+							id: id,
+							files: files,
+							status: Object.values(worker.state).filter((task) => { return task.status === TaskStatus.WORKING }).length < settings.state.download.max_threads ? TaskStatus.WORKING : TaskStatus.QUEUED
+						});
+			
+						switch (worker.state[id].status) {
+							case TaskStatus.WORKING: {
+								return worker.state[id].start();
+							}
+						}
+					}
+				});
+			}
 		});
 	}
-	public evaluate(url: string) {
-		return new Promise<Task>((resolve, reject) => {
-			for (const schema of scheme) {
-				if (new RegExp(schema).test(url)) {
-					return read.script(Number(/([0-9]+).html$/.exec(url)![1])).then((script) => {
-						return this.placeholder(Number(script.id)).then((folder) => {
-							return resolve(
-								new Task(url, script.title, script.files.map((value, index) => {
-									return new TaskFile(value.url, node_path.join(config.directory, folder, `${index}.${value.url.split(/\./).pop()}`));
-								}), { headers: { "referer": "https://hitomi.la" } }, Number(script.id))
-							);
-						});
-					});
-				}
-				return reject();
-			}
+	public async delete(id: number) {
+		return new Promise<void>(async (resolve, reject) => {
+			// @ts-ignore
+			node_fs.rmdirSync(node_path.dirname(worker.state[id]!.files.first!.path), { recursive: true });
+			// halt writable(s)
+			worker.state[id].cancel();
+			// resolve
+			return resolve();
 		});
 	}
 }
-export default (new Download(config.max_threads, config.max_working));
+
+export class Task {
+	public readonly id: number;
+	public readonly files: Array<TaskFile>;
+	public status: TaskStatus;
+
+	constructor(args: {
+		id: number;
+		files: Array<TaskFile>;
+		status: TaskStatus;
+	}) {
+		this.id = args.id;
+		this.files = args.files;
+		this.status = args.status;
+		// sync with worker
+		worker.spawn(this);
+	}
+	public start() {
+		return new Promise<void>((resolve, reject) => {
+			// scan for unfinished files
+			let files: Array<TaskFile> = this.files.filter((file) => { return !file.written(); });
+
+			const recursive = (file: TaskFile): void => {
+				// it may takes time
+				return file.write(this.id, () => {
+					// remove self
+					files = files.filter((unfinished) => { return unfinished !== file; });
+
+					if (!files.length) {
+						return complete();
+					}
+					return recursive(files.first!);
+				});
+			}
+			const complete = () => {
+				// mark as finished
+				this.status = TaskStatus.FINISHED;
+				// notify
+				worker.notify(this.id, this);
+
+				for (const task of
+					Object.values(worker.state).filter((task) => {
+						task.status === TaskStatus.QUEUED
+					}).take(settings.state.download.max_threads - Object.values(worker.state).filter((task) => {
+						task.status === TaskStatus.WORKING
+					}).length
+				)) {
+					task.start();
+				}
+				return resolve();
+			}
+			// all finished
+			if (!files.length) {
+				return complete();
+			}
+			if (this.status !== TaskStatus.WORKING) {
+				// mark as working
+				this.status = TaskStatus.WORKING;
+				// notify
+				worker.notify(this.id, this);
+			}
+			worker.handle((state) => {
+				if (state.key === this.id && !state.value) return this.cancel();
+			});
+			window.bridge.handle(BridgeEvent.CLOSE, () => {
+				return this.cancel();
+			});
+			// generate directory recursively
+			node_fs.mkdirSync(node_path.dirname(files.first!.path), { recursive: true });
+
+			for (const file of files.take(settings.state.download.max_working)) {
+				recursive(file);
+			}
+		});
+	}
+	public cancel() {
+		if (worker.state[this.id]) {
+			worker.despawn(this);	
+		}
+	}
+}
+
+export class TaskFile {
+	public readonly url: string;
+	public readonly path: string;
+	public readonly size: number;
+
+	constructor(args: {
+		url: string;
+		path: string;
+		size: number;
+	}) {
+		this.url = args.url;
+		this.path = args.path;
+		this.size = args.size;
+	}
+	public stats() {
+		return node_fs.statSync(this.path);
+	}
+	public exist() {
+		return node_fs.existsSync(this.path);
+	}
+	public written() {
+		return this.exist() ? this.stats().size === this.size : false;
+	}
+	public write(id: number, callback?: () => void) {
+		// write by chunk
+		const writable = node_fs.createWriteStream(this.path);
+
+		worker.handle((state) => {
+			if (state.key === id && !state.value) return writable.end();
+		});
+		request.GET(this.url, {
+			type: "arraybuffer",
+			headers: this.exist() ? { "range": `bytes=${this.stats().size}-` } : {},
+			progress: (chunk, progress) => {
+				writable.write(new Uint8Array(chunk as ArrayBuffer));
+			}
+		}).then((response) => {
+			return writable.end(callback);
+		});
+	}
+}
+
+export enum TaskStatus {
+	QUEUED		= "QUEUED",
+	WORKING		= "WORKING",
+	FINISHED	= "FINISHED"
+}
+
+export default (
+	new Download()
+)

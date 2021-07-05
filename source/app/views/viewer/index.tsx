@@ -1,86 +1,99 @@
-import * as React from "react";
-
+// framework
+import React from "react";
+// style
 import "./index.scss";
+// components
+import MediaPlayer, { MediaProps } from "@/app/components/media.player";
+// modules
+import discord, { RichPresence } from "@/modules/discord.rpc";
+import read, { GalleryScript } from "@/modules/hitomi.la/gallery";
+// states
+import navigation, { Viewport } from "@/states/navigation";
 
-import MediaPlayer from "@/app/components/media.player";
-
-import DiscordRPC from "@/modules/discord.rpc";
-
-import utility from "@/modules/utility";
-import worker from "@/statics/worker";
-import read, { GalleryJS } from "@/modules/hitomi/read";
-
-import { API_COMMAND } from "@/common";
-import { StaticEvent } from "@/statics";
-import { MediaProps } from "@/app/components/media.player";
-import { Viewport } from "@/statics/router";
-
-export type ViewerProps = {
+export interface ViewerProps {
 	enable: boolean;
-};
-export type ViewerState = {
-	script?: GalleryJS,
-	media: MediaProps;
-};
+}
 
-class Viewer extends React.Component<ViewerProps> {
+export interface ViewerState {
+	media: MediaProps;
+	script?: GalleryScript;
+}
+
+export class Viewer extends React.Component<ViewerProps> {
 	public props: ViewerProps;
 	public state: ViewerState;
+	
 	constructor(props: ViewerProps) {
 		super(props);
 		this.props = props;
 		this.state = {
-			script: undefined,
 			media: {
 				options: {
 					files: []
 				}
-			}
+			},
+			script: undefined
 		};
 
-		window.static.on(StaticEvent.ROUTER, (args) => {
-			const [$new, $old] = args as [Viewport, Viewport];
-
-			switch ($new.view) {
-				case "viewer": {
-					this.setState({ ...this.state, script: undefined, media: { ...this.state.media, options: { ...this.state.media.options, files: [] } } });
-					read.script($new.options as number).then(async (script) => {
-						const files = [];
-
-						for (let index = 0; index < script.files.length; index++) {
-							if (worker.get()[script.id] && worker.get()[script.id].files[index].written === worker.get()[script.id].files[index].size) {
-								if (await window.API(API_COMMAND.IS_PACKAGED).then((packaged) => { return packaged; })) {
-									files.push(`${await window.API(API_COMMAND.GET_PATH).then((path) => { return path; })}/${worker.get()[script.id]?.files[index].path}`);
-								} else {
-									files.push(`../${worker.get()[script.id]?.files[index].path}`);
-								}
-							} else {
-								files.push(script.files[index].url);
+		navigation.handle((state) => {
+			switch (state.after.view) {
+				case Viewport.VIEWER: {
+					this.setState({
+						...this.state,
+						media: { 
+							...this.state.media,
+							options: {
+								...this.state.media.options,
+								files: []
 							}
-						}
-						this.setState({ ...this.state, script: script, media: { ...this.state.media, options: { ...this.state.media.options, files: files } } });
+						},
+						script: undefined
+					}, () => {
+						read.script(state.after.args as number).then((script) => {
+							this.setState({
+								...this.state,
+								media: {
+									...this.state.media,
+									options: {
+										...this.state.media.options,
+										files: script.files.map((file) => { return file.url; })
+									}
+								},
+								script: script
+							});
+						});
 					});
-					break;
-				}
-				default: {
 					break;
 				}
 			}
 		});
 	}
-	static getDerivedStateFromProps($new: ViewerProps, $old: ViewerProps) {
-		return $new;
+	static getDerivedStateFromProps(after: ViewerProps, before: ViewerProps) {
+		return after;
 	}
 	public render() {
 		if (this.props.enable) {
-			// discord rich presence
-			DiscordRPC.set_activity({ ...(this.state.script ? { details: this.state.script.title + "#" + this.state.script.id, state: "Reading", partySize: undefined, partyMax: undefined } : { details: undefined, state: "Fetching", partySize: undefined, partyMax: undefined }) });
+			// discord
+			discord.update(new RichPresence({
+				//condition
+				...this.state.script ? 
+				{
+					state: "Reading",
+					details: `${this.state.script.title}#${this.state.script.id}`
+				} : {
+					state: "Fetching",
+					details: "waiting..."
+				},
+				partySize: undefined,
+				partyMax: undefined
+			}));
 		}
 		return (
-			<section data-viewport="viewer" class={utility.inline({ "enable": this.props.enable, "right": true })}>
+			<section data-viewport="viewer" class={inline({ "enable": this.props.enable, "right": true })}>
 				<MediaPlayer options={{ files: this.state.media.options.files }}></MediaPlayer>
 			</section>
 		);
 	}
 }
+
 export default Viewer;

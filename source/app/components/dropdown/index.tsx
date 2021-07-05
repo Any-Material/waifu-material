@@ -1,32 +1,33 @@
-import * as React from "react";
-
+// framework
+import React from "react";
+// style
 import "./index.scss";
-
+// components
 import Button from "@/app/components/button";
 
-import utility from "@/modules/utility";
-
-import { CommonProps } from "@/common";
-
-export type DropDownProps = CommonProps & {
-	enable: boolean,
+export interface DropDownProps extends Props {
+	enable: boolean;
 	options: {
-		type: "input" | "select",
-		items: [string, string][],
-		highlight: string,
+		type: "input" | "select";
+		items: Array<[string, string]>;
+		highlight: string;
 		placeholder: string;
-	},
+	};
 	handler?: Record<"click" | "change" | "confirm", (value: string) => void>;
-};
-export type DropDownState = {
-	index: number,
-	focus: boolean;
-};
+}
 
-class DropDown extends React.Component<DropDownProps, DropDownState> {
+export interface DropDownState {
+	index: number;
+	focus: boolean;
+}
+
+export class DropDown extends React.Component<DropDownProps, DropDownState> {
 	public props: DropDownProps;
 	public state: DropDownState;
-	public refer: { input: React.RefObject<HTMLInputElement>; };
+	public refer: {
+		input: React.RefObject<HTMLInputElement>;
+	};
+
 	constructor(props: DropDownProps) {
 		super(props);
 		this.props = props;
@@ -46,12 +47,12 @@ class DropDown extends React.Component<DropDownProps, DropDownState> {
 			this.refer.input.current.value = value;
 		}
 	}
-	static getDerivedStateFromProps($new: DropDownProps, $old: DropDownProps) {
-		return $new;
+	static getDerivedStateFromProps(after: DropDownProps, before: DropDownProps) {
+		return after;
 	}
 	public render() {
 		return (
-			<section data-component="dropdown" id={this.props.id} class={utility.inline({ ...this.props.class })}>
+			<section data-component="dropdown" id={this.props.id} class={inline({ ...this.props.class })}>
 				<input class="contrast" ref={this.refer.input} readOnly={!this.props.enable || this.props.options.type === "select"} placeholder={this.props.options.placeholder} defaultValue={this.props.options.placeholder}
 					onFocus={() => {
 						this.setState({ ...this.state, focus: true });
@@ -69,7 +70,7 @@ class DropDown extends React.Component<DropDownProps, DropDownState> {
 									if (!this.state.index) {
 										this.setState({ ...this.state, index: NaN });
 									} else {
-										this.setState({ ...this.state, index: utility.clamp(this.state.index - 1, 0, this.props.options.items.length - 1) });
+										this.setState({ ...this.state, index: (this.state.index - 1).clamp(0, this.props.options.items.length - 1) });
 									}
 									break;
 								}
@@ -77,7 +78,7 @@ class DropDown extends React.Component<DropDownProps, DropDownState> {
 									if (isNaN(this.state.index)) {
 										this.setState({ ...this.state, index: 0 });
 									} else {
-										this.setState({ ...this.state, index: utility.clamp(this.state.index + 1, 0, this.props.options.items.length - 1) });
+										this.setState({ ...this.state, index: (this.state.index + 1).clamp(0, this.props.options.items.length - 1) });
 									}
 									break;
 								}
@@ -94,7 +95,7 @@ class DropDown extends React.Component<DropDownProps, DropDownState> {
 						}
 					}}>
 				</input>
-				<section id="expandable" class={utility.inline({ "active": this.state.focus && this.props.options.items.length > 0, "contrast": true })}>
+				<section id="expandable" class={inline({ "active": this.state.focus && this.props.options.items.length > 0, "contrast": true })}>
 					{this.props.options.items.map((item, index) => {
 						return (
 							<Button class={{ "center-y": true, "active": this.state.index === index }} data-description={item[1]} key={index}
@@ -111,4 +112,5 @@ class DropDown extends React.Component<DropDownProps, DropDownState> {
 		);
 	}
 }
+
 export default DropDown;

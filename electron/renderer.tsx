@@ -1,59 +1,107 @@
+// electron
 import { ipcRenderer } from "electron";
-
+// framework
 import * as React from "react";
 import * as ReactDOM from "react-dom";
-
+// components
 import App from "@/app";
+// modules
+import settings from "@/modules/settings";
+// api
+import { API_COMMAND, BridgeEvent } from "@/api";
 
-import DiscordRPC from "@/modules/discord.rpc";
+const certification: Array<string> = [];
 
-import { BridgeEvent, API_COMMAND } from "@/common";
-
-const upvotes: Record<string, boolean> = {};
-
+function call(command: API_COMMAND, ...args: any[]) {
+	return ipcRenderer.invoke("API", command, args).then((response) => {
+		return response;
+	});
+}
+// @ts-ignore
+window.API = {
+	//
+	// 1. Entry point
+	//
+	// TitleBar.tsx -> close()
+	// OS native interaction -> ipcRenderer -> close()
+	//
+	// 2. close() Function
+	//
+	// triggers [BridgeEvent]
+	//
+	// 3. Individual [BridgeEvent] listeners
+	//
+	// calls back close() with different vertify arguments
+	//
+	// 4. close() Function
+	//
+	// calls [API_COMMAND] to truly close [BrowserWindow]
+	//
+	[API_COMMAND.CLOSE](vertify: string) {
+		if (!certification.contains(vertify)) {
+			certification.add(vertify);
+		} else {
+			throw new Error();
+		}
+		for (const validator of settings.state.app.requires) {
+			if (!certification.contains(validator)) {
+				return window.bridge.trigger(BridgeEvent.CLOSE);
+			}
+		}
+		return call(API_COMMAND.CLOSE);
+	},
+	[API_COMMAND.FOCUS]() {
+		return call(API_COMMAND.FOCUS);
+	},
+	[API_COMMAND.BLUR]() {
+		return call(API_COMMAND.BLUR);
+	},
+	[API_COMMAND.MINIMIZE]() {
+		return call(API_COMMAND.MINIMIZE);
+	},
+	[API_COMMAND.MAXIMIZE]() {
+		return call(API_COMMAND.MAXIMIZE);
+	},
+	[API_COMMAND.UNMAXIMIZE]() {
+		return call(API_COMMAND.UNMAXIMIZE);
+	},
+	[API_COMMAND.FULLSCREEN]() {
+		return call(API_COMMAND.FULLSCREEN);
+	},
+	[API_COMMAND.DIRECTORY]() {
+		return call(API_COMMAND.DIRECTORY);
+	},
+	[API_COMMAND.PACKAGED]() {
+		return call(API_COMMAND.PACKAGED);
+	}
+}
+// ipc to bridge
 ipcRenderer.on(BridgeEvent.CLOSE, () => {
-	window.bridge.emit(BridgeEvent.BLUR);
+	window.API.close("renderer");
 });
 ipcRenderer.on(BridgeEvent.FOCUS, () => {
-	window.bridge.emit(BridgeEvent.BLUR);
+	window.bridge.trigger(BridgeEvent.BLUR);
 });
 ipcRenderer.on(BridgeEvent.BLUR, () => {
-	window.bridge.emit(BridgeEvent.BLUR);
+	window.bridge.trigger(BridgeEvent.BLUR);
 });
 ipcRenderer.on(BridgeEvent.MINIMIZE, () => {
-	window.bridge.emit(BridgeEvent.MINIMIZE);
+	window.bridge.trigger(BridgeEvent.MINIMIZE);
 });
 ipcRenderer.on(BridgeEvent.MAXIMIZE, () => {
-	window.bridge.emit(BridgeEvent.MAXIMIZE);
+	window.bridge.trigger(BridgeEvent.MAXIMIZE);
 });
 ipcRenderer.on(BridgeEvent.UNMAXIMIZE, () => {
-	window.bridge.emit(BridgeEvent.UNMAXIMIZE);
+	window.bridge.trigger(BridgeEvent.UNMAXIMIZE);
 });
 ipcRenderer.on(BridgeEvent.ENTER_FULL_SCREEN, () => {
-	window.bridge.emit(BridgeEvent.ENTER_FULL_SCREEN);
+	window.bridge.trigger(BridgeEvent.ENTER_FULL_SCREEN);
 });
 ipcRenderer.on(BridgeEvent.LEAVE_FULL_SCREEN, () => {
-	window.bridge.emit(BridgeEvent.LEAVE_FULL_SCREEN);
+	window.bridge.trigger(BridgeEvent.LEAVE_FULL_SCREEN);
 });
 ipcRenderer.on(BridgeEvent.TOGGLE_TERMINAL, () => {
-	window.bridge.emit(BridgeEvent.TOGGLE_TERMINAL);
+	window.bridge.trigger(BridgeEvent.TOGGLE_TERMINAL);
 });
-// upvotes
-window.bridge.on(BridgeEvent.CLOSE, (args) => {
-	const [$vote] = args as [string];
-
-	if (upvotes[$vote]) {
-		throw new Error();
-	} else {
-		upvotes[$vote] = true;
-	}
-	if (["storage"].every((item) => { return upvotes[item]; })) {
-		window.API(API_COMMAND.CLOSE);
-	}
-});
-// render react
+// render
 ReactDOM.render(<App></App>, document.getElementById("app"));
-// handle exception
-process.on("uncaughtException", (error) => { console.error(error.stack); });
-// discord rich presence
-DiscordRPC.set_activity({ details: "Starting...", startTimestamp: Date.now(), largeImageKey: "waifu_material", largeImageText: "Sômbiàn#7940", smallImageKey: "discord", smallImageText: "discord.gg/Gp7tWCe", partyId: "https://github.com/Any-Material", instance: true });

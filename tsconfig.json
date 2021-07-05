@@ -15,8 +15,9 @@
 		"resolveJsonModule": true
 	},
 	"files": [
-		"source/typings/merge.ts",
-		"source/typings/window.ts"
+		"source/typings/global.ts",
+		"source/typings/nullable.ts",
+		"source/typings/properties.ts"
 	],
 	"include": [
 		"**/*.ts",
@@ -26,10 +27,10 @@
 	"exclude": [
 		"/node_modules",
 		"/package-lock.json",
-		"/debugs",
 		"/bundles",
 		"/downloads",
 		"/config.json",
+		"/bookmark.json",
 		"/build",
 		"/releases"
 	]

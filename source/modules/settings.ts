@@ -1,74 +1,88 @@
-import storage from "@/modules/storage";
+// assets
 import template from "@/assets/config.json";
+// modules
+import storage from "@/modules/storage";
+// states
+import { StateHandler } from "@/states";
 
-import { StoragePreset } from "@/modules/storage";
-
-export type Config = {
-	gallery: {
-		resolution: "L" | "M" | "H",
-		censorship: boolean,
-		discovery: string[];
-	},
-	paging: {
-		metre: number;
-	},
-	lazyload: {
-		retry: number;
-	},
-	search: {
-		query: string,
-		per_page: number;
-	},
-	storage: {
-		auto_save: number;
-	},
-	download: {
-		folder: string,
-		directory: string,
-		max_threads: number,
-		max_working: number;
-	};
-};
-class Settings {
-	private import = storage.get_data<Config>(StoragePreset.CONFIG);
-	// @ts-ignore
-	private settings: Config = {};
-	constructor() {
-		for (const section of Object.keys(template)) {
-			// @ts-ignore
-			if (this.import[section]) {
-				// @ts-ignore
-				for (const property of Object.keys(template[section])) {
-					// @ts-ignore
-					if (!this.settings[section]) {
-						// @ts-ignore
-						this.settings[section] = {};
-					}
-					// @ts-ignore
-					if (this.import[section][property]) {
-						// @ts-ignore
-						this.settings[section][property] = this.import[section][property];
-					} else {
-						// @ts-ignore
-						this.settings[section][property] = template[section][property];
-					}
-				}
-			} else {
-				// @ts-ignore
-				this.settings[section] = template[section];
-			}
-		}
+export class Settings extends StateHandler<Config> {
+	constructor(args: {
+		state: Config
+	}) {
+		super(args);
+		
+		storage.state["config"].state = super.state as Record<string, any>;
 	}
-	public get() {
-		return { ...this.settings };
+	public get state() {
+		return super.state;
 	}
-	public set(key: keyof Config, value: Config[keyof Config]) {
-		// @ts-ignore
-		this.settings[key] = {
-			...template[key],
-			...value
-		};
-		storage.set_data(StoragePreset.CONFIG, this.settings);
+	public set state(state: Config) {
+		super.state = state;
+		storage.state["config"].state = super.state as Record<string, any>;
 	}
 }
-export default (new Settings());
+
+export class Config {
+	public app: {
+		requires: Array<string>;
+	};
+	public search: {
+		query: string;
+		per_page: number;
+	};
+	public storage: {
+		auto_save: number;
+	};
+	public download: {
+		directory: string;
+		placeholder: string;
+		max_threads: number;
+		max_working: number;
+	};
+	public lazyload: {
+		retry: number;
+	};
+	public gallery: {
+		resolution: "lowest";
+		censorship: boolean;
+		discovery: string[];
+	};
+	public paging: {
+		metre: number;
+	};
+
+	constructor(args: {
+		app: Config["app"];
+		search: Config["search"];
+		storage: Config["storage"];
+		download: Config["download"];
+		lazyload: Config["lazyload"];
+		gallery: Config["gallery"];
+		paging: Config["paging"];
+	}) {
+		this.app = args.app;
+		this.search = args.search;
+		this.storage = args.storage;
+		this.download = args.download;
+		this.lazyload = args.lazyload;
+		this.gallery = args.gallery;
+		this.paging = args.paging;
+	}
+}
+
+export default (
+	//
+	// singleton
+	//
+	new Settings({
+		state: new Config({
+			app:		(storage.state["config"].state as Record<string, any> as Config).app		?? template.app,
+			search:		(storage.state["config"].state as Record<string, any> as Config).search		?? template.search,
+			storage:	(storage.state["config"].state as Record<string, any> as Config).storage	?? template.storage,
+			download:	(storage.state["config"].state as Record<string, any> as Config).download	?? template.download,
+			lazyload:	(storage.state["config"].state as Record<string, any> as Config).lazyload	?? template.lazyload,
+			gallery:	(storage.state["config"].state as Record<string, any> as Config).gallery	?? template.gallery,
+			paging:		(storage.state["config"].state as Record<string, any> as Config).paging		?? template.paging
+		})
+	})
+)

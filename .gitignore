@@ -6,7 +6,7 @@
 /bundles
 /downloads
 /config.json
-/favorite.json
+/bookmark.json
 # electron
 /build
 /releases

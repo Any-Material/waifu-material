@@ -1,168 +1,179 @@
+// framework
 import * as React from "react";
-
+// style
 import "./index.scss";
-
+// components
 import Button from "@/app/components/button";
 import LazyLoad from "@/app/components/lazyload";
-
-import * as node_path from "path";
+// node.js
 import * as node_process from "child_process";
-
+// assets
 import language from "@/assets/language.json";
-
+// modules
 import settings from "@/modules/settings";
-import download from "@/modules/download";
-import utility from "@/modules/utility";
-import router from "@/statics/router";
+import download, { TaskStatus } from "@/modules/download";
+import { GalleryBlock } from "@/modules/hitomi.la/gallery";
+// states
+import bookmark from "@/states/bookmark";
+import navigation, { NavigationState, Viewport } from "@/states/navigation";
+import worker from "@/states/worker";
 
-import { CommonProps } from "@/common";
-import { Config } from "@/modules/settings";
-import { GalleryBlock } from "@/modules/hitomi/read";
-import { TaskStatus } from "@/modules/download";
-import favorite from "@/statics/favorite";
+const _Censorship = new RegExp(`(${["guro", "ryona", "snuff", "blood", "torture", "amputee", "cannibalism"].join("|")})`);
 
-export type GalleryProps = CommonProps & {
+export interface GalleryProps extends Props {
 	options: {
 		status: {
-			task: TaskStatus,
-			favorite: boolean;
-		},
+			task?: TaskStatus;
+			bookmark?: boolean;
+		};
 		gallery: GalleryBlock;
-	},
+	};
 	handler?: Record<"click", (button: number, key: string, value: string) => void>;
-};
-export type GalleryState = {
-	toggle: "unset" | "buttons" | "discovery";
-};
+}
 
-const censorship = new RegExp("(" + ["guro", "ryona", "snuff", "blood", "torture", "amputee", "cannibalism"].join("|") + ")");
+export interface GalleryState {
+	display: GalleryDisplay;
+}
 
-class Gallery extends React.Component<GalleryProps, GalleryState> {
-	readonly config: Config["gallery"] = settings.get().gallery;
+export enum GalleryDisplay {
+	TITLE		= "TITLE",
+	BUTTONS		= "BUTTONS",
+	INFORMATION	= "INFORMATION"
+}
+
+export class Gallery extends React.Component<GalleryProps, GalleryState> {
 	public props: GalleryProps;
 	public state: GalleryState;
+
 	constructor(props: GalleryProps) {
 		super(props);
 		this.props = props;
 		this.state = {
-			toggle: "unset"
+			display: GalleryDisplay.TITLE
 		};
 	}
-	static getDerivedStateFromProps($new: GalleryProps, $old: GalleryProps) {
-		return $new;
+	public wrap<T>(content: Array<T> | T) {
+		return content instanceof Array ? content : [content];
+	}
+	public censorship() {
+		for (const tag of this.props.options.gallery.tags ?? []) {
+			if (_Censorship.test(tag)) {
+				return true;
+			}
+		}
+		return false;
+	}
+	static getDerivedStateFromProps(after: GalleryProps, before: GalleryProps) {
+		return after;
 	}
 	public render() {
 		return (
-			<section data-component="gallery" id={this.props.id} class={utility.inline({ [this.state.toggle]: true, "contrast": true, ...this.props.class })}>
+			<section data-component="gallery" id={this.props.id} class={inline({ [this.state.display]: true, "contrast": true, ...this.props.class })}>
 				<section id="upper" class="contrast">
-					<LazyLoad class={{ "censorship": this.props.options.gallery.tags ? !isNaN(utility.index_of(this.props.options.gallery.tags, censorship)) : false }} options={{ source: this.props.options.gallery.thumbnail[0] }}></LazyLoad>
+					<LazyLoad class={{ "censorship": this.censorship() }} options={{ source: this.props.options.gallery.thumbnail[0] }}></LazyLoad>
 					<section id="discovery" class="fluid">
 						<section id="buttons">
 							<Button class={{ "contrast": true }}
 								handler={{
 									click: () => {
-										this.setState({ ...this.state, toggle: "buttons" });
+										this.setState({ ...this.state, display: GalleryDisplay.BUTTONS });
 									}
 								}}
 							></Button>
 						</section>
 						<section id="scrollable" class="scroll-y">
-							{this.state.toggle !== "unset" ? this.config.discovery.map((key, index) => {
-								// @ts-ignore
-								return (this.props.options.gallery[key] instanceof Array ? this.props.options.gallery[key].length : this.props.options.gallery[key]) ? (
-									<legend id="bundle" key={index}>
-										{key}:
-										{utility.wrap(this.props.options.gallery[key as keyof GalleryBlock]).map((value, index) => {
-											const tag = {
-												// @ts-ignore
-												key: key === "tags" ? /♂/.test(value) ? "male" : /♀/.test(value) ? "female" : "tag" : key,
-												// @ts-ignore
-												value: key === "language" ? Object.keys(language)[utility.index_of(Object.values(language), value)] : value
-											};
-											return (
-												<Button id="key" class={{ "contrast": true, "center": true, "censorship": typeof value === "string" ? censorship.test(value) : false }} key={index}
-													handler={{
-														click: (button) => {
-															// @ts-ignore
-															this.props.handler?.click(button, tag.key, tag.value.replace(/♂|♀/, "").replace(/^\s|\s$/g, "").replace(/\s+/g, "_"));
-														}
-													}}
-												// @ts-ignore
-												><legend id="value" class="eclipse center-x">{key === "tags" ? <><strong id="field" class={tag.key}>{tag.key}</strong>:<>{tag.value.replace(/♂|♀/, "").replace(/^\s|\s$/g, "").replace(/\s+/g, "_")}</></> : tag.value}</legend></Button>
-											);
-										})}
-									</legend>
-								) : undefined;
-							}) : undefined}
+							{(() => {
+								if (this.state.display === GalleryDisplay.TITLE) return;
+								return (
+									settings.state.gallery.discovery.map((key, index) => {
+										if (!this.props.options.gallery[key as keyof GalleryBlock]) return;
+										return (
+											<legend id="bundle" key={index}>
+												{key}:
+												{(this.wrap(this.props.options.gallery[key as keyof GalleryBlock]) as Array<string>).map((value, index) => {
+													const tag = {
+														key: key === "tags" ? /♂/.test(value) ? "male" : /♀/.test(value) ? "female" : "tag" : key,
+														value: key === "language" ? Object.keys(language)[Object.values(language).index(value)] : value
+													};
+													return (
+														<Button id="key" class={{ "contrast": true, "center": true, "censorship": typeof value === "string" ? _Censorship.test(value) : false }} key={index}
+															handler={{
+																click: (button) => {
+																	this.props.handler?.click(button, tag.key, tag.value.replace(/♂|♀/, "").replace(/^\s|\s$/g, "").replace(/\s+/g, "_"));
+																}
+															}}>
+															<legend id="value" class="eclipse center-x">
+																{key === "tags" ? <><strong id="field" class={tag.key}>{tag.key}</strong>:<>{tag.value.replace(/♂|♀/, "").replace(/^\s|\s$/g, "").replace(/\s+/g, "_")}</></> : tag.value}
+															</legend>
+														</Button>
+													);
+												})}
+											</legend>
+										);
+									})
+								)
+							})()}
 						</section>
 					</section>
 					<section id="buttons" class="contrast center fluid">
 						{[
 							{
-								html: require(`@/assets/icons/read.svg`),
+								HTML: require(`@/assets/icons/read.svg`),
 								click: () => {
-									router.set({ view: "viewer", options: this.props.options.gallery.id });
+									navigation.state = new NavigationState({ view: Viewport.VIEWER, args: this.props.options.gallery.id });
 								}
 							},
 							{
-								html: require(`@/assets/icons/favorite.svg`),
+								HTML: require(`@/assets/icons/bookmark.svg`),
 								click: () => {
-									favorite.set(this.props.options.gallery.id, !favorite.get()[this.props.options.gallery.id]);
+									if (bookmark.state[this.props.options.gallery.id]) {
+										bookmark.remove(this.props.options.gallery.id);
+									} else {
+										bookmark.add(this.props.options.gallery.id);
+									}
 								},
 								style: {
-									"highlight": this.props.options.status.favorite
+									"highlight": this.props.options.status.bookmark
 								}
 							},
-							...(!isNaN(utility.index_of([TaskStatus.WORKING, TaskStatus.FINISHED, TaskStatus.QUEUED], this.props.options.status.task)) ? [
+							...this.props.options.status.task && [TaskStatus.WORKING, TaskStatus.FINISHED, TaskStatus.QUEUED].contains(this.props.options.status.task) ? [
 								{
-									html: require(`@/assets/icons/delete.svg`),
+									HTML: require(`@/assets/icons/delete.svg`),
 									click: () => {
-										download.delete(this.props.options.gallery.id).then(() => {
-											// TODO: none
+										download.delete(this.props.options.gallery.id);
+									}
+								}] : [],
+							...this.props.options.status.task && [TaskStatus.WORKING, TaskStatus.FINISHED].contains(this.props.options.status.task) ? [
+								{
+									HTML: require(`@/assets/icons/open.svg`),
+									click: () => {
+										download.folder(this.props.options.gallery.id).then((directory) => {
+											node_process.exec(`start "" "${directory}"`);
 										});
 									}
-								}] : []),
-							...(!isNaN(utility.index_of([TaskStatus.WORKING, TaskStatus.FINISHED], this.props.options.status.task)) ? [
+								}] : [],
+							...!this.props.options.status.task ? [
 								{
-									html: require(`@/assets/icons/open.svg`),
+									HTML: require(`@/assets/icons/download.svg`),
 									click: () => {
-										download.placeholder(this.props.options.gallery.id).then((folder) => {
-											node_process.exec(`start "" "${node_path.resolve(settings.get().download.directory, folder)}"`);
-										});
+										download.download(this.props.options.gallery.id);
 									}
-								}] : []),
-							...(!isNaN(utility.index_of([TaskStatus.NONE], this.props.options.status.task)) ? [
-								{
-									html: require(`@/assets/icons/download.svg`),
-									click: () => {
-										download.evaluate(`https://hitomi.la/galleries/${this.props.options.gallery.id}.html`).then((task) => {
-											download.create(task).then(() => {
-												// TODO: none
-											});
-										});
-									}
-								}] : []),
+								}] : [],
 							{
-								html: require(`@/assets/icons/copy.svg`),
+								HTML: require(`@/assets/icons/copy.svg`),
 								click: () => {
 									navigator.clipboard.writeText(`https://hitomi.la/galleries/${this.props.options.gallery.id}.html`);
 								}
 							},
 							{
-								html: require(`@/assets/icons/discovery.svg`),
+								HTML: require(`@/assets/icons/discovery.svg`),
 								click: () => {
-									this.setState({ ...this.state, toggle: "discovery" });
+									this.setState({ ...this.state, display: GalleryDisplay.INFORMATION });
 								}
 							}
-						].map(({ html, click, style }, index) => {
+						].map(({ HTML, click, style }, index) => {
 							return (
-								<Button class={style} key={index}
-									handler={{
-										click: () => {
-											click();
-										}
-									}}
-								>{html}</Button>
+								<Button class={style as Record<string, boolean>} key={index} handler={{ click: click }}>{HTML}</Button>
 							);
 						})}
 					</section>
@@ -172,10 +183,11 @@ class Gallery extends React.Component<GalleryProps, GalleryState> {
 					<legend id="title" class="eclipse">{this.props.options.gallery.title}</legend>
 				</section>
 				<section id="status">
-					<legend id="ribbon" class={utility.inline({ [TaskStatus[this.props.options.status.task]]: true, "contrast": true, "center": true })}>{TaskStatus[this.props.options.status.task]}</legend>
+					<legend id="ribbon" class={inline({ [this.props.options.status.task ?? "default"]: true, "contrast": true, "center": true })}>{this.props.options.status.task}</legend>
 				</section>
 			</section>
 		);
 	}
 }
+
 export default Gallery;

@@ -1,117 +1,106 @@
+// nodejs
 import * as node_fs from "fs";
 import * as node_path from "path";
+// states
+import { MappedStateHandler } from "@/states";
+// api
+import { BridgeEvent } from "@/api";
 
-import { BridgeEvent } from "@/common";
+export class Storage extends MappedStateHandler<Record<string, StorageState>> {
+	constructor(args: {
+		state: Storage["_state"];
+	}) {
+		super({ state: {} });
 
-export enum StoragePreset {
-	CONFIG = "config",
-	FAVORITE = "favorite"
-};
-export type StorageState = {
-	path: string,
-	data: Record<string, string | boolean | number | object> | Array<string | number | object> | "@import";
-};
-class Storage {
-	private container: Record<string, StorageState> = {};
-	constructor(storage: Storage["container"]) {
-		for (const key of Object.keys(storage)) {
-			this.register(key, storage[key].path, storage[key].data);
+		for (const key of Object.keys(args.state)) {
+			this.register(key, args.state[key].path, args.state[key].state);
 		}
-		// before close
-		window.bridge.on(BridgeEvent.BEFORE_CLOSE, () => {
-			// save all
-			this.save();
-			// upvote
-			window.bridge.emit(BridgeEvent.CLOSE, ["storage"]);
-		});
-		// every ~ ms
+
 		setInterval(() => {
-			// save all
-			this.save();
-		}, 1000 * 60 * 5);
-	}
-	private define(object: Record<string, any>, array: string[], data: any) {
-		for (const [index, value] of array.entries()) {
-			if (index === array.length - 1) {
-				object[value] = data;
-				return;
-			} else if (typeof object[value] === "undefined") {
-				object[value] = {};
+			for (const key of Object.keys(this.state)) {
+				// export file
+				this.export(key);
 			}
-			object = object[value];
-		}
-	}
-	private delete(object: Record<string, any>, array: string[]) {
-		for (const [index, value] of array.entries()) {
-			if (index === array.length - 1) {
-				delete object[value];
-				return;
-			} else if (typeof object[value] === "undefined") {
-				return;
+		},
+		//
+		// 1000 milliseconds = 1 second
+		// 60 seconds = 1 minute
+		//
+		1000 * 60 * 5);
+
+		window.bridge.handle(BridgeEvent.CLOSE, () => {
+			for (const key of Object.keys(this.state)) {
+				// export file
+				this.export(key);
 			}
-			object = object[value];
-		}
-	}
-	private return(object: Record<string, any>, array: string[]) {
-		for (const [index, value] of array.entries()) {
-			if (index === array.length - 1) {
-				return object[value];
-			} else if (typeof object[value] === "undefined") {
-				return;
-			}
-			object = object[value];
-		}
-	}
-	public get_path(key: string) {
-		return this.return(this.container, [...key.split(/\./), "path"]) as StorageState["path"];
-	}
-	public set_path(key: string, path: StorageState["path"]) {
-		this.define(this.container, [...key.split(/\./), "path"], path);
-	}
-	public get_data<Type>(key: string) {
-		return this.return(this.container, [...key.split(/\./), "data"]) as Type;
-	}
-	public set_data(key: string, data: StorageState["data"]) {
-		this.define(this.container, [...key.split(/\./), "data"], data);
-	}
-	public register(key: string, path: StorageState["path"], data: StorageState["data"]) {
-		this.define(this.container, [...key.split(/\./)], {
-			path: path,
-			data: data === "@import" ? this.import(path) : data
+			window.API.close("storage");
 		});
-		this.export(key);
 	}
-	public un_register(key: string) {
-		node_fs.unlinkSync(this.get_path(key));
-		this.delete(this.container, [...key.split(/\./)]);
+	public get state() {
+		return super.state;
 	}
-	private import(key_or_path: string) {
-		try {
-			return JSON.parse(node_fs.readFileSync(this.get_path(key_or_path) || key_or_path, "utf-8"));
-		} catch {
-			return {} as StorageState["data"];
-		}
+	/**
+	 * @deprecated this function will **ALWAYS** throw an error
+	 */
+	public set state(state: Storage["_state"]) {
+		//
+		// getter and setter must share the same accessibility,
+		// but since getter is public, so do the setter must be.
+		// to prevent bulk define, this function will always throw error.
+		//
+		throw new Error("bulk define storage may cause unwanted side effects");
 	}
-	private export(key: string) {
-		node_fs.mkdirSync(node_path.dirname(this.get_path(key)), { recursive: true });
-		node_fs.writeFileSync(this.get_path(key), JSON.stringify(this.get_data(key)));
-	}
-	public exist(key: string) {
-		return Boolean(this.return(this.container, [...key.split(/\./)]));
-	}
-	public save() {
-		for (const key of Object.keys(this.container)) {
+	public register(key: keyof Storage["_state"], path: StorageState["path"], fallback: StorageState["state"]) {
+		this.modify(key, this.import(path, fallback), (unsafe) => {
+			// export file
 			this.export(key);
+		});
+	}
+	public unregister(key: keyof Storage["_state"]) {
+		node_fs.unlink(this.state[key].path, () => {
+			this.modify(key, null);
+		});
+	}
+	private import(path: StorageState["path"], fallback: StorageState["state"] = {}) {
+		try {
+			return new StorageState({ path: path, state: JSON.parse(node_fs.readFileSync(path, "utf-8")) });
+		} catch {
+			return new StorageState({ path: path, state: fallback });
 		}
+	}
+	private export(key: keyof Storage["_state"]) {
+		node_fs.mkdirSync(node_path.dirname(this.state[key].path), { recursive: true });
+		node_fs.writeFileSync(this.state[key].path, JSON.stringify(this.state[key].state));
 	}
 }
-export default (new Storage({
-	[StoragePreset.CONFIG]: {
-		path: "./config.json",
-		data: "@import"
-	},
-	[StoragePreset.FAVORITE]: {
-		path: "./favorite.json",
-		data: "@import"
+
+export class StorageState {
+	public readonly path: string;
+	public state: Record<string, any> | Array<any> | string;
+
+	constructor(args: {
+		path: StorageState["path"];
+		state: StorageState["state"];
+	}) {
+		this.path = args.path;
+		this.state = args.state;
 	}
-}));
+}
+
+export default (
+	//
+	// singleton
+	//
+	new Storage({
+		state: {
+			"config": new StorageState({
+				path: "./config.json",
+				state: {}
+			}),
+			"bookmark": new StorageState({
+				path: "./bookmark.json",
+				state: []
+			})
+		}
+	})
+)

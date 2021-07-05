@@ -1,43 +1,43 @@
-import * as React from "react";
-
+// framework
+import React from "react";
+// style
 import "./index.scss";
+// components
+import Query, { QueryProps } from "@/app/components/query";
+import GalleryList, { GalleryListProps } from "@/app/components/gallery.list";
+import Paging, { PagingProps } from "@/app/components/paging";
+// modules
+import read from "@/modules/hitomi.la/gallery";
+import filter from "@/modules/hitomi.la/encode";
+import { GalleryBlock } from "@/modules/hitomi.la/gallery";
+import search, { GalleryPage } from "@/modules/hitomi.la/search";
+import discord, { RichPresence } from "@/modules/discord.rpc";
+import settings, { Config } from "@/modules/settings";
 
-import Query from "@/app/components/query";
-import GalleryList from "@/app/components/gallery.list";
-import Paging from "@/app/components/paging";
-
-import DiscordRPC from "@/modules/discord.rpc";
-
-import read from "@/modules/hitomi/read";
-import filter from "@/modules/hitomi/filter";
-import search from "@/modules/hitomi/search";
-import suggest from "@/modules/hitomi/suggest";
-import settings from "@/modules/settings";
-import utility from "@/modules/utility";
-
-import { GalleryBlock } from "@/modules/hitomi/read";
-import { QueryProps } from "@/app/components/query";
-import { PagingProps } from "@/app/components/paging";
-import { GalleryListProps } from "@/app/components/gallery.list";
-
-export type BrowserProps = {
+export interface BrowserProps extends Props {
 	enable: boolean;
-};
-export type BrowserState = {
-	query: QueryProps,
-	gallerylist: GalleryListProps,
-	paging: PagingProps,
-	session: {
-		history: [string, number][],
-		version: number;
-	},
-	blocks: [GalleryBlock[], number];
-};
+}
 
-class Browser extends React.Component<BrowserProps> {
+export interface BrowserState {
+	query: QueryProps;
+	gallerylist: GalleryListProps;
+	paging: PagingProps;
+	session: {
+		history: Array<[string, number]>;
+		version: number;
+	};
+	blocks: [Array<GalleryBlock>, number];
+}
+
+export class Browser extends React.Component<BrowserProps> {
 	public props: BrowserProps;
 	public state: BrowserState;
-	public refer: { query: React.RefObject<Query>; gallerylist: React.RefObject<GalleryList>; paging: React.RefObject<Paging>; };
+	public refer: {
+		query: React.RefObject<Query>;
+		paging: React.RefObject<Paging>;
+		gallerylist: React.RefObject<GalleryList>;
+	};
+
 	constructor(props: BrowserProps) {
 		super(props);
 		this.props = props;
@@ -45,7 +45,7 @@ class Browser extends React.Component<BrowserProps> {
 			query: {
 				enable: true,
 				options: {
-					value: settings.get().search.query
+					value: settings.state.search.query
 				},
 				handler: {
 					confirm: (value) => {
@@ -86,15 +86,16 @@ class Browser extends React.Component<BrowserProps> {
 			gallerylist: React.createRef(),
 			paging: React.createRef()
 		};
+
 		window.addEventListener("keydown", (event) => {
 			if (this.props.enable && this.state.blocks.length && !document.querySelectorAll("input:focus").length) {
 				switch (event.key) {
 					case "ArrowLeft": {
-						this.set_paging({ ...this.state.paging, options: { ...this.state.paging.options, index: utility.clamp(this.state.paging.options.index - 1, 0, this.state.paging.options.size - 1) } });
+						this.set_paging({ ...this.state.paging, options: { ...this.state.paging.options, index: (this.state.paging.options.index - 1).clamp(0, this.state.paging.options.size - 1) } });
 						break;
 					}
 					case "ArrowRight": {
-						this.set_paging({ ...this.state.paging, options: { ...this.state.paging.options, index: utility.clamp(this.state.paging.options.index + 1, 0, this.state.paging.options.size - 1) } });
+						this.set_paging({ ...this.state.paging, options: { ...this.state.paging.options, index: (this.state.paging.options.index + 1).clamp(0, this.state.paging.options.size - 1) } });
 						break;
 					}
 				}
@@ -114,11 +115,11 @@ class Browser extends React.Component<BrowserProps> {
 				if (this.refer.query.current && Boolean(button) === new RegExp(`${key}:${value}`).test(this.refer.query.current.get()!)) {
 					switch (button) {
 						case 0: {
-							this.refer.query.current.set([...this.refer.query.current.get()!.split(/\s+/), `${key}:${value}`].filter(($value) => { return $value; }).map(($value) => { return $value; }).join("\u0020"));
+							this.refer.query.current.set([...this.refer.query.current.get()!.split(/\s+/), `${key}:${value}`].join("\u0020"));
 							break;
 						}
 						case 2: {
-							this.refer.query.current.set([...this.refer.query.current.get()!.split(/\s+/)].filter(($value) => { return $value; }).map(($value) => { return new RegExp(`${key}:${value}`).test($value) ? undefined : $value; }).join("\u0020"));
+							this.refer.query.current.set([...this.refer.query.current.get()!.split(/\s+/)].map(($value) => { return new RegExp(`${key}:${value}`).test($value) ? undefined : $value; }).join("\u0020"));
 							break;
 						}
 					}
@@ -133,13 +134,13 @@ class Browser extends React.Component<BrowserProps> {
 	public set_session(value: BrowserState["session"]) {
 		this.setState({ ...this.state, session: value }, () => {
 			this.set_blocks([[], 0]);
-			search.get(filter.get(value.history[value.version][0]), value.history[value.version][1], settings.get().search.per_page).then(({ array, size, singular }) => {
-				const blocks = new Array<GalleryBlock>(Math.min(size - settings.get().search.per_page * value.history[value.version][1], settings.get().search.per_page));
+			search.get(filter.parse(value.history[value.version][0]), new GalleryPage({ index: value.history[value.version][1], limit: settings.state.search.per_page })).then(({ list, length, singular }) => {
+				const blocks = new Array<GalleryBlock>(Math.min(length - settings.state.search.per_page * value.history[value.version][1], settings.state.search.per_page));
 				for (let index = 0; index < blocks.length; index++) {
-					read.block(array[index + (singular ? 0 : value.history[value.version][1] * settings.get().search.per_page)]).then((block) => {
+					read.block(list[index + (singular ? 0 : value.history[value.version][1] * settings.state.search.per_page)]).then((block) => {
 						blocks[index] = block;
 						if (Object.keys(blocks).length === blocks.length) {
-							this.set_blocks([blocks, size]);
+							this.set_blocks([blocks, length]);
 						}
 					});
 				}
@@ -167,7 +168,7 @@ class Browser extends React.Component<BrowserProps> {
 					enable: true,
 					options: {
 						...this.state.paging.options,
-						size: ~~(value[1] / settings.get().search.per_page)
+						size: ~~(value[1] / settings.state.search.per_page)
 					}
 				}
 			} : {
@@ -193,8 +194,13 @@ class Browser extends React.Component<BrowserProps> {
 		this.setState({ ...this.state, query: value }, () => {
 			this.set_paging({ ...this.state.paging, options: { ...this.state.paging.options, index: 0 } });
 		});
-		suggest.up();
-		settings.set("search", { ...settings.get().search, query: value.options.value });
+		settings.state = new Config({
+			...settings.state,
+			search: {
+				...settings.state.search,
+				query: value.options.value
+			}
+		});
 	}
 	public set_gallerylist(value: BrowserState["gallerylist"]) {
 		this.setState({ ...this.state, gallerylist: value });
@@ -204,19 +210,32 @@ class Browser extends React.Component<BrowserProps> {
 			this.set_session({ history: [...this.state.session.history, [this.state.query.options.value, value.options.index]], version: this.state.session.version + 1 });
 		});
 	}
-	static getDerivedStateFromProps($new: BrowserProps, $old: BrowserProps) {
-		return $new;
+	static getDerivedStateFromProps(after: BrowserProps, before: BrowserProps) {
+		return after;
 	}
 	public componentDidMount() {
-		this.set_session({ history: [[settings.get().search.query, 0]], version: 0 });
+		this.set_session({ history: [[settings.state.search.query, 0]], version: 0 });
 	}
 	public render() {
 		if (this.props.enable) {
-			// discord rich presence
-			DiscordRPC.set_activity({ details: this.state.query.options.value, ...(this.state.paging.enable ? { state: "Browsing", partySize: this.state.paging.options.index + 1, partyMax: this.state.paging.options.size } : { state: "Fetching", partySize: undefined, partyMax: undefined }) });
+			// discord
+			discord.update(new RichPresence({
+				// condition
+				...this.state.paging.enable ?
+				{
+					state: "Browsing",
+					partySize: this.state.paging.options.index + 1,
+					partyMax: this.state.paging.options.size
+				} : {
+					state: "Fetching",
+					partySize: undefined,
+					partyMax: undefined
+				},
+				details: this.state.query.options.value
+			}));
 		}
 		return (
-			<section data-viewport="browser" class={utility.inline({ "enable": this.props.enable, "left": true })}>
+			<section data-viewport="browser" class={inline({ "enable": this.props.enable, "left": true })}>
 				<section id="scrollable" class="scroll-y">
 					<Query ref={this.refer.query} enable={this.state.query.enable} options={this.state.query.options} handler={this.state.query.handler}></Query>
 					<GalleryList ref={this.refer.gallerylist} options={this.state.gallerylist.options} handler={this.state.gallerylist.handler}></GalleryList>
@@ -226,4 +245,5 @@ class Browser extends React.Component<BrowserProps> {
 		);
 	}
 }
+
 export default Browser;

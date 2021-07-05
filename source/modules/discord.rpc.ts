@@ -4,65 +4,120 @@ import * as RPC from "discord-rpc";
 /**
  * @see https://discord.com/developers/docs/rich-presence/how-to
  */
-export type RichPresence = {
-	state?: string,
-	details?: string,
-	startTimestamp?: number,
-	endTimestamp?: number,
-	largeImageKey?: string,
-	largeImageText?: string,
-	smallImageKey?: string,
-	smallImageText?: string,
-	partyId?: string,
-	partySize?: number,
-	partyMax?: number,
-	matchSecret?: string,
-	spectateSecret?: string,
-	joinSecret?: string,
-	instance?: boolean;
+export class RichPresence {
+	public state?: string;
+	public details: string;
+	public startTimestamp?: number;
+	public endTimestamp?: number;
+	public largeImageKey?: string;
+	public largeImageText?: string;
+	public smallImageKey?: string;
+	public smallImageText?: string;
+	public partyId?: string;
+	public partySize?: number;
+	public partyMax?: number;
+	public matchSecret?: string;
+	public spectateSecret?: string;
+	public joinSecret?: string;
+	public instance?: boolean;
+
+	constructor(args: {
+		state?: RichPresence["state"];
+		details: RichPresence["details"];
+		startTimestamp?: RichPresence["startTimestamp"];
+		endTimestamp?: RichPresence["endTimestamp"];
+		largeImageKey?: RichPresence["largeImageKey"];
+		largeImageText?: RichPresence["largeImageText"];
+		smallImageKey?: RichPresence["smallImageKey"];
+		smallImageText?: RichPresence["smallImageText"];
+		partyId?: RichPresence["partyId"];
+		partySize?: RichPresence["partySize"];
+		partyMax?: RichPresence["partyMax"];
+		matchSecret?: RichPresence["matchSecret"];
+		spectateSecret?: RichPresence["spectateSecret"];
+		joinSecret?: RichPresence["joinSecret"];
+		instance?: RichPresence["instance"];
+	}) {
+		this.state = args.state;
+		this.details = args.details;
+		this.startTimestamp = args.startTimestamp;
+		this.endTimestamp = args.endTimestamp;
+		this.largeImageKey = args.largeImageKey;
+		this.largeImageText = args.largeImageText;
+		this.smallImageKey = args.smallImageKey;
+		this.smallImageText = args.smallImageText;
+		this.partyId = args.partyId;
+		this.partySize = args.partySize;
+		this.partyMax = args.partyMax;
+		this.spectateSecret = args.spectateSecret;
+		this.joinSecret = args.joinSecret;
+		this.instance = args.instance;
+	}
 };
 
 /**
  * @see https://discord.com/developers/applications/{application_id}/information
  */
-class DiscordRPC {
-	private available: boolean = false;
-	private activity: RichPresence = {};
-	readonly client = new RPC.Client({ transport: "ipc" });
-	constructor(client_id: string) {
+ export class DiscordRPC {
+	private presence: RichPresence;
+	private available: boolean;
+	private readonly client = new RPC.Client({ transport: "ipc" });
+
+	constructor(args: {
+		secret: string;
+		presence: RichPresence;
+	}) {
+		this.presence = args.presence;
+		this.available = false;
+
 		this.client.once("ready", () => {
 			this.update();
 		});
-		this.client.login({ clientId: client_id }).then(() => {
-			this.available = true;
-		}).catch(() => {
-			this.available = false;
-		});
+		this.login(args.secret);
 	}
-	private update() {
-		if (this.available) {
-			this.client.setActivity(this.activity);
+	private login(secret: string) {
+		if (!this.available) {
+			this.client.login({ clientId: secret }).then(() => {
+				this.available = true;
+			}).catch(() => {
+				setTimeout(() => {
+					this.login(secret);
+				},
+				//
+				// 1000 milliseconds = 1 second
+				// 60 seconds = 1 minute
+				//
+				1000 * 60 * 5);
+			});
 		}
 	}
-	public get_activity() {
-		return this.activity;
-	}
-	public set_activity(activity: RichPresence, preserve: boolean = true) {
+	public update(presence: RichPresence = this.presence, preserve: boolean = true) {
 		if (preserve) {
-			for (const key of Object.keys(activity)) {
-				// @ts-ignore
-				if (activity[key]) {
-					// @ts-ignore
-					this.activity[key] = activity[key];
-				} else {
-					// @ts-ignore
-					delete this.activity[key];
-				}
-			}
+			this.presence = new RichPresence({ ...this.presence, ...presence });
 		} else {
-			this.activity = activity;
+			this.presence = presence;
 		}
-		this.update();
+		if (this.available) {
+			this.client.setActivity(this.presence);
+		}
 	}
 }
-export default (new DiscordRPC("526951055079112724"));
+
+export default (
+	//
+	// singleton
+	//
+	new DiscordRPC({
+		secret: "526951055079112724",
+		presence: new RichPresence({
+			details: "Starting...",
+			startTimestamp: Date.now(),
+			largeImageKey: "ios",
+			largeImageText: "Sombian#7940",
+			smallImageKey: "discord",
+			smallImageText: "discord.gg/Gp7tWCe",
+			partyId: "https://github.com/Any-Material",
+			instance: true
+		})
+	})
+)

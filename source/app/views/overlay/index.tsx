@@ -1,24 +1,28 @@
-import * as React from "react";
-
+// framework
+import React from "react";
+// style
 import "./index.scss";
-
+// components
 import Terminal from "@/app/components/terminal";
-
-import utility from "@/modules/utility";
+// modules
 import download from "@/modules/download";
-import search from "@/modules/hitomi/search";
-import filter from "@/modules/hitomi/filter";
+import search from "@/modules/hitomi.la/search";
+import encode from "@/modules/hitomi.la/encode";
 
-export type OverlayProps = {
+// Preference | Confirm | Terminal
+export interface OverlayProps extends Props {
 	enable: boolean;
-	// Preference | Confirm | Terminal
-};
-export type OverlayState = {};
+}
 
-class Overlay extends React.Component<OverlayProps> {
+export interface OverlayState {}
+
+export class Overlay extends React.Component<OverlayProps> {
 	public props: OverlayProps;
 	public state: OverlayState;
-	public refer: { terminal: React.RefObject<Terminal>; };
+	public refer: {
+		terminal: React.RefObject<Terminal>;
+	};
+
 	constructor(props: OverlayProps) {
 		super(props);
 		this.props = props;
@@ -27,43 +31,47 @@ class Overlay extends React.Component<OverlayProps> {
 			terminal: React.createRef()
 		};
 	}
-	static getDerivedStateFromProps($new: OverlayProps, $old: OverlayProps) {
-		return $new;
+	static getDerivedStateFromProps(after: OverlayProps, before: OverlayProps) {
+		return after;
 	}
 	public render() {
 		return (
-			<section data-viewport="overlay" class={utility.inline({ "enable": this.props.enable, "center": true })}>
+			<section data-viewport="overlay" class={inline({ "enable": this.props.enable, "center": true })}>
 				<section id="overlay" class="contrast center">
 					<Terminal ref={this.refer.terminal} options={{
+						//
 						// Prefix.EXCLUDE tags are considered as argument given how terminal parse the query
+						//
 						download: (args, flags) => {
 							if (!Object.keys(args).length) {
-								return this.refer.terminal.current?.error("Invalid Argument");
+								return this.refer.terminal.current?.error("Invalid arguments");
 							}
-							this.refer.terminal.current?.write([{ value: `Downloading...`, color: "grey" }]); let count = 0;
+							this.refer.terminal.current?.write([{ value: "Downloading...", color: "grey" }]);
+							
+							let count = 0;
 
-							search.get(filter.get((Object.keys(args).map((key) => { return /[0-9]+/.test(key) ? args[key] : "-" + key }).join("\u0020"))), 0, 0).then((galleries) => {
-								for (const gallery of galleries.array) {
-									download.evaluate(`https://hitomi.la/galleries/${gallery}.html`).then((task) => {
-										download.create(task).then(() => {
-											count++;
-											this.refer.terminal.current?.write([{ value: `Created (${count}/${galleries.array.length})` }]);
-										});
-									})
+							search.get(encode.parse((Object.keys(args).map((key) => { return /[0-9]+/.test(key) ? args[key] : `-${key}` }).join("\u0020")))).then((galleries) => {
+								for (const id of galleries.list) {
+									download.download(id).then(() => {
+										count++;
+										this.refer.terminal.current?.write([{ value: `Created (${count}/${galleries.length})` }]);
+									});
 								}
 							});
 						},
 						delete: (args, flags) => {
 							if (!Object.keys(args).length) {
-								return this.refer.terminal.current?.error("Invalid Argument");
+								return this.refer.terminal.current?.error("Invalid arguments");
 							}
-							this.refer.terminal.current?.write([{ value: `Deleting...`, color: "grey" }]); let count = 0;
+							this.refer.terminal.current?.write([{ value: `Deleting...`, color: "grey" }]);
+							
+							let count = 0;
 
-							search.get(filter.get((Object.keys(args).map((key) => { return /[0-9]+/.test(key) ? args[key] : "-" + key }).join("\u0020"))), 0, 0).then((galleries) => {
-								for (const gallery of galleries.array) {
-									download.delete(gallery).then(() => {
+							search.get(encode.parse((Object.keys(args).map((key) => { return /[0-9]+/.test(key) ? args[key] : `-${key}` }).join("\u0020")))).then((galleries) => {
+								for (const id of galleries.list) {
+									download.delete(id).then(() => {
 										count++;
-										this.refer.terminal.current?.write([{ value: `Deleted (${count}/${galleries.array.length})` }]);
+										this.refer.terminal.current?.write([{ value: `Deleted (${count}/${galleries.length})` }]);
 									});
 								}
 							});
@@ -74,4 +82,5 @@ class Overlay extends React.Component<OverlayProps> {
 		);
 	}
 }
+
 export default Overlay;

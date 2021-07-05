@@ -22,7 +22,13 @@ const compiler_main = webpack({
 			compiler_main.close(() => {
 				compiler_preload.close(() => {
 					compiler_renderer.close(() => {
-						fs.writeFile("./build/package.json", JSON.stringify({ name: package.name, main: package.main, version: package.version, description: package.description }), {}, () => {
+						fs.writeFile("./build/package.json",
+							JSON.stringify({
+								name: package.name,
+								main: package.main,
+								version: package.version,
+								description: package.description
+							}), {}, () => {
 							builder.build({
 								targets: builder.Platform.WINDOWS.createTarget("zip"),
 								config: {

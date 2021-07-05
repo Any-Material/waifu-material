@@ -1,16 +1,16 @@
-import { ipcRenderer } from "electron";
-
+// nodejs
 import * as node_events from "events";
+// prototypes
+import "@/prototypes";
+// api
+import { BridgeEvent } from "@/api";
 
-import { API_COMMAND } from "@/common";
-
 // @ts-ignore
-window.API = (command: API_COMMAND) => {
-	return ipcRenderer.invoke("API", command).then((result) => {
-		return result;
-	});
-};
-// @ts-ignore
-window.bridge = new class BridgeListener extends node_events.EventEmitter { };
-// @ts-ignore
-window.static = new class StaticListener extends node_events.EventEmitter { };
+window.bridge = new class BridgeListener extends node_events.EventEmitter {
+	public handle(event: BridgeEvent, callback: (...args: any[]) => void) {
+		super.on(event, callback);
+	}
+	public trigger(event: BridgeEvent,...args: any[]) {
+		super.emit(event, args);
+	}
+}

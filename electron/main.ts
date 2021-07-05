@@ -1,6 +1,7 @@
+// electron
 import { app, session, globalShortcut, BrowserWindow, ipcMain } from "electron";
-
-import { BridgeEvent, API_COMMAND } from "@/common";
+// api
+import { API_COMMAND, BridgeEvent } from "@/api";
 
 app.on("ready", () => {
 	// create window
@@ -47,8 +48,13 @@ app.on("ready", () => {
 	window.on("unresponsive", () => {
 		window.reload();
 	});
-	// window to ipcMain
-	window.on(BridgeEvent.CLOSE, () => {
+	/**
+	 * @see electron/renderer.ts
+	 */
+	window.on(BridgeEvent.CLOSE, (event) => {
+		// prevent close
+		event.preventDefault();
+		// send event anyways
 		window.webContents.send(BridgeEvent.CLOSE);
 	});
 	window.on(BridgeEvent.FOCUS, () => {
@@ -77,11 +83,13 @@ app.on("ready", () => {
 			window.webContents.send(BridgeEvent.TOGGLE_TERMINAL)
 		}
 	});
-	// preload communication
-	ipcMain.handle("API", async (event, command: API_COMMAND, args: any[]) => {
+	/**
+	 * @see electron/preload.ts
+	 */
+	 ipcMain.handle("API", async (event, command: API_COMMAND, ...args: any[]) => {
 		switch (command) {
 			case API_COMMAND.CLOSE: {
-				return window.close();
+				return window.destroy();
 			}
 			case API_COMMAND.FOCUS: {
 				return window.focus();
@@ -98,17 +106,14 @@ app.on("ready", () => {
 			case API_COMMAND.UNMAXIMIZE: {
 				return window.unmaximize();
 			}
-			case API_COMMAND.ENTER_FULL_SCREEN: {
-				return window.setFullScreen(true);
+			case API_COMMAND.FULLSCREEN: {
+				return window.setFullScreen(!window.isFullScreen());
 			}
-			case API_COMMAND.LEAVE_FULL_SCREEN: {
-				return window.setFullScreen(false);
+			case API_COMMAND.DIRECTORY: {
+				return app.getPath("exe").replace(/(electron|nozomi-material).exe/, "");
 			}
-			case API_COMMAND.IS_PACKAGED: {
+			case API_COMMAND.PACKAGED: {
 				return app.isPackaged;
-			}
-			case API_COMMAND.GET_PATH: {
-				return app.getPath("exe").replace(/(electron|nozomi-material).exe$/, "");
 			}
 		}
 	});

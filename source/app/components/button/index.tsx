@@ -1,19 +1,18 @@
-import * as React from "react";
-
+// framework
+import React from "react";
+// style
 import "./index.scss";
 
-import utility from "@/modules/utility";
-
-import { CommonProps } from "@/common";
-
-export type ButtonProps = CommonProps & {
+export interface ButtonProps extends Props {
 	handler?: Record<"click", (button: number) => void>;
-};
-export type ButtonState = {};
+}
 
-class Button extends React.Component<ButtonProps, ButtonState> {
+export interface ButtonState {}
+
+export class Button extends React.Component<ButtonProps, ButtonState> {
 	public props: ButtonProps;
 	public state: ButtonState;
+
 	constructor(props: ButtonProps) {
 		super(props);
 		this.props = props;
@@ -21,7 +20,7 @@ class Button extends React.Component<ButtonProps, ButtonState> {
 	}
 	public render() {
 		return (
-			<button data-component="button" id={this.props.id} class={utility.inline({ "un_draggable": true, ...this.props.class })} {...typeof this.props.children === "string" ? { dangerouslySetInnerHTML: { __html: this.props.children } } : {}}
+			<button data-component="button" id={this.props.id} class={inline({ "un_draggable": true, ...this.props.class })} {...typeof this.props.children === "string" ? { dangerouslySetInnerHTML: { __html: this.props.children } } : {}}
 				onMouseUp={(event) => {
 					this.props.handler?.click(event.button);
 				}}
@@ -29,4 +28,5 @@ class Button extends React.Component<ButtonProps, ButtonState> {
 		);
 	}
 }
+
 export default Button;

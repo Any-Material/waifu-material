@@ -14,7 +14,7 @@ npm install
 npm run serve
 ```
 
-# Documentation
+# How to use
 
-[ko-KR](./documents/instruction/ko-KR.md) (Korean)<br>
-[en-US](./documents/instruction/en-US.md) (English)<br>
+Korean ([link](./documents/instruction/ko-KR/how-to-use.md))<br>
+English ([link](./documents/instruction/en-US/how-to-use.md))<br>

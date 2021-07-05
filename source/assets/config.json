@@ -1,6 +1,27 @@
 {
+	"app": {
+		"requires": [
+			"storage"
+		]
+	},
+	"search": {
+		"query": "",
+		"per_page": 25
+	},
+	"storage": {
+		"auto_save": 300000
+	},
+	"download": {
+		"directory": "./downloads",
+		"placeholder": "{id}",
+		"max_threads": 5,
+		"max_working": 5
+	},
+	"lazyload": {
+		"retry": 10
+	},
 	"gallery": {
-		"resolution": "L",
+		"resolution": "lowest",
 		"censorship": true,
 		"discovery": [
 			"type",
@@ -16,21 +37,5 @@
 	},
 	"paging": {
 		"metre": 10
-	},
-	"lazyload": {
-		"retry": 5
-	},
-	"search": {
-		"query": "",
-		"per_page": 25
-	},
-	"storage": {
-		"auto_save": 300000
-	},
-	"download": {
-		"folder": "{id}",
-		"directory": "./downloads",
-		"max_threads": 5,
-		"max_working": 5
 	}
 }

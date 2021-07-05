@@ -1,87 +1,64 @@
-import * as React from "react";
-
+// framework
+import React from "react";
+// style
 import "./index.scss";
-
+// components
 import Gallery from "@/app/components/gallery";
+// modules
+import worker from "@/states/worker";
+import bookmark from "@/states/bookmark";
+import { TaskStatus } from "@/modules/download";
+import { GalleryBlock } from "@/modules/hitomi.la/gallery";
 
-import favorite from "@/statics/favorite";
-import utility from "@/modules/utility";
-import worker from "@/statics/worker";
-
-import { CommonProps } from "@/common";
-import { StaticEvent } from "@/statics";
-import { GalleryBlock } from "@/modules/hitomi/read";
-import { Task, TaskStatus } from "@/modules/download";
-
-export type GalleryListProps = CommonProps & {
+export interface GalleryListProps extends Props {
 	options: {
 		blocks: GalleryBlock[];
-	},
-	handler?: Record<"click", (button: number, key: string, value: string) => void>;
-};
-export type GalleryListState = {
-	[key: number]: {
-		task: TaskStatus,
-		favorite: boolean;
 	};
-};
+	handler?: Record<"click", (button: number, key: string, value: string) => void>;
+}
 
-class GalleryList extends React.Component<GalleryListProps, GalleryListState> {
+export interface GalleryListState {
+	[key: string]: {
+		task?: TaskStatus;
+		bookmark?: boolean;
+	};
+}
+
+export class GalleryList extends React.Component<GalleryListProps, GalleryListState> {
 	public props: GalleryListProps;
 	public state: GalleryListState;
+
 	constructor(props: GalleryListProps) {
 		super(props);
 		this.props = props;
-		this.state = this.initState();
+		this.state = [
+			...Object.keys(worker.state),
+			...Object.keys(bookmark.state)
+		].reduce((array, value) => (
+			array[value.toString()] = {
+				task: worker.state[Number(value)]?.status,
+				bookmark: bookmark.state[Number(value)]
+			}, array
+		), {} as GalleryListState)
 
-		window.static.on(StaticEvent.WORKER, (args) => {
-			const [$index, $new] = args as [number, Task | undefined, Task | undefined];
-
-			switch ($new ? $new.status : TaskStatus.NONE) {
-				case this.state[$index]?.task: {
-					break;
-				}
-				default: {
-					this.setState({ ...this.state, [$index]: { ...this.state[$index], task: $new ? $new.status : TaskStatus.NONE } });
-					break;
-				}
+		worker.handle((state) => {
+			if (state.value?.status !== this.state[state.key]?.task) {
+				this.setState({ ...this.state, [state.key]: { ...this.state[state.key], task: state.value?.status } });
 			}
 		});
-		window.static.on(StaticEvent.FAVORITE, (args) => {
-			const [$index, $new] = args as [number, number | undefined, number | undefined];
-
-			this.setState({ ...this.state, [$index]: { ...this.state[$index], favorite: $new } });
+		bookmark.handle((state) => {
+			this.setState({ ...this.state, [state.key]: { ...this.state[state.key], bookmark: Boolean(state.value) } });
 		});
 	}
-	private initState() {
-		const state: GalleryListState = {};
-		
-		for (const task of Object.values(worker.get())) {
-			state[task.id] = {
-				task: task.status,
-				favorite: false
-			};
-		}
-		for (const id of Object.keys(favorite.get())) {
-			// @ts-ignore
-			state[id] = {
-			// @ts-ignore
-				...state[id],
-			// @ts-ignore
-				favorite: favorite.get()[id]
-			};
-		}
-		return state;
-	}
-	static getDerivedStateFromProps($new: GalleryListProps, $old: GalleryListProps) {
-		return $new;
+	static getDerivedStateFromProps(after: GalleryListProps, before: GalleryListProps) {
+		return after;
 	}
 	public render() {
 		return (
-			<section data-component="gallery.list" id={this.props.id} class={utility.inline({ ...this.props.class })}>
+			<section data-component="gallery.list" id={this.props.id} class={inline({ ...this.props.class })}>
 				{this.props.options.blocks.map((gallery, index) => {
 					return (
-						<Gallery options={{ gallery: gallery, status: { task: this.state[gallery.id]?.task || TaskStatus.NONE, favorite: this.state[gallery.id]?.favorite || false } }} key={index}
+						<Gallery options={{ gallery: gallery, status: { task: this.state[gallery.id]?.task, bookmark: this.state[gallery.id]?.bookmark } }} key={index}
 							handler={{
 								click: (button, key, value) => {
 									this.props.handler?.click(button, key, value);
@@ -94,4 +71,5 @@ class GalleryList extends React.Component<GalleryListProps, GalleryListState> {
 		);
 	}
 }
+
 export default GalleryList;
