@@ -95,14 +95,6 @@ export class Terminal extends React.Component<TerminalProps> {
 	public render() {
 		return (
 			<section data-viewport="terminal" id={this.props.id} class={inline({ "scroll-y": true, ...this.props.class })}>
-				<section id="indexing" class="contrast">
-					{this.state.history.map((written, index) => {
-						return (
-							<legend class="center" key={index}>{index}</legend>
-						);
-					})}
-					<legend id="pointer" class="center">⏵</legend>
-				</section>
 				<section id="history">
 					{this.state.history.map((written, index) => {
 						return (
@@ -140,11 +132,12 @@ export class Terminal extends React.Component<TerminalProps> {
 										...this.props.options
 									};
 									if (command[parsed.command]) {
+										// execute
 										command[parsed.command](parsed.args, parsed.flags);
 									} else {
 										this.error("Invalid command");
 									}
-									// reset input
+									// reset
 									(event.target as HTMLInputElement).value = "";
 									break;
 								}

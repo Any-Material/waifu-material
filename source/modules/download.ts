@@ -50,29 +50,26 @@ export class Download {
 		return new Promise<void>(async (resolve, reject) => {
 			const script = await gallery.script(id);
 			const folder = await this.folder(id);
-			const files: Array<TaskFile> = [];
-	
-			for (const file of script.files) {
-				request.HEAD(file.url).then((response) => {
-					files.add(new TaskFile({
+
+			new Task({
+				id: id,
+				files: script.files.map((file) => {
+					return new TaskFile({
 						url: file.url,
 						path: node_path.join(settings.state.download.directory, folder, file.name),
-						size: Number(response.headers["content-length"])
-					}));
-					if (files.length === script.files.length) {
-						new Task({
-							id: id,
-							files: files,
-							status: Object.values(worker.state).filter((task) => { return task.status === TaskStatus.WORKING }).length < settings.state.download.max_threads ? TaskStatus.WORKING : TaskStatus.QUEUED
-						});
-			
-						switch (worker.state[id].status) {
-							case TaskStatus.WORKING: {
-								return worker.state[id].start();
-							}
-						}
-					}
-				});
+						size: 0
+					});
+				}),
+				status: Object.values(worker.state).filter((task) => { return task.status === TaskStatus.WORKING }).length < settings.state.download.max_threads ? TaskStatus.WORKING : TaskStatus.QUEUED
+			});
+
+			switch (worker.state[id].status) {
+				case TaskStatus.WORKING: {
+					return resolve(worker.state[id].start());
+				}
+				default: {
+					return resolve();
+				}
 			}
 		});
 	}
@@ -172,7 +169,7 @@ export class Task {
 export class TaskFile {
 	public readonly url: string;
 	public readonly path: string;
-	public readonly size: number;
+	public size: number;
 
 	constructor(args: {
 		url: string;
@@ -186,11 +183,8 @@ export class TaskFile {
 	public stats() {
 		return node_fs.statSync(this.path);
 	}
-	public exist() {
-		return node_fs.existsSync(this.path);
-	}
 	public written() {
-		return this.exist() ? this.stats().size === this.size : false;
+		return this.size ? this.stats().size === this.size : false;
 	}
 	public write(id: number, callback?: () => void) {
 		// write by chunk
@@ -201,11 +195,15 @@ export class TaskFile {
 		});
 		request.GET(this.url, {
 			type: "arraybuffer",
-			headers: this.exist() ? { "range": `bytes=${this.stats().size}-` } : {},
+			headers: this.size ? { "range": `bytes=${this.stats().size}-` } : {},
 			progress: (chunk, progress) => {
+				// update size
+				this.size = progress.total;
+				// write to disk
 				writable.write(new Uint8Array(chunk as ArrayBuffer));
 			}
 		}).then((response) => {
+			// finish
 			return writable.end(callback);
 		});
 	}

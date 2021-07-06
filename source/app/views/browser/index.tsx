@@ -134,10 +134,10 @@ export class Browser extends React.Component<BrowserProps> {
 	public set_session(value: BrowserState["session"]) {
 		this.setState({ ...this.state, session: value }, () => {
 			this.set_blocks([[], 0]);
-			search.get(filter.parse(value.history[value.version][0]), new GalleryPage({ index: value.history[value.version][1], limit: settings.state.search.per_page })).then(({ list, length, singular }) => {
-				const blocks = new Array<GalleryBlock>(Math.min(length - settings.state.search.per_page * value.history[value.version][1], settings.state.search.per_page));
+			search.get(filter.parse(value.history[value.version][0]), new GalleryPage({ index: value.history[value.version][1], limit: settings.state.search.limit })).then(({ list, length, singular }) => {
+				const blocks = new Array<GalleryBlock>(Math.min(length - settings.state.search.limit * value.history[value.version][1], settings.state.search.limit));
 				for (let index = 0; index < blocks.length; index++) {
-					read.block(list[index + (singular ? 0 : value.history[value.version][1] * settings.state.search.per_page)]).then((block) => {
+					read.block(list[index + (singular ? 0 : value.history[value.version][1] * settings.state.search.limit)]).then((block) => {
 						blocks[index] = block;
 						if (Object.keys(blocks).length === blocks.length) {
 							this.set_blocks([blocks, length]);
@@ -168,7 +168,7 @@ export class Browser extends React.Component<BrowserProps> {
 					enable: true,
 					options: {
 						...this.state.paging.options,
-						size: ~~(value[1] / settings.state.search.per_page)
+						size: ~~(value[1] / settings.state.search.limit)
 					}
 				}
 			} : {
@@ -231,7 +231,7 @@ export class Browser extends React.Component<BrowserProps> {
 					partySize: undefined,
 					partyMax: undefined
 				},
-				details: this.state.query.options.value
+				details: this.state.query.options.value.length ? this.state.query.options.value : "language:all"
 			}));
 		}
 		return (

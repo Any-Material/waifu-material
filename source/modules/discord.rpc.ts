@@ -87,7 +87,7 @@ export class RichPresence {
 				// 1000 milliseconds = 1 second
 				// 60 seconds = 1 minute
 				//
-				1000 * 60 * 5);
+				1000 * 60);
 			});
 		}
 	}
@@ -98,6 +98,7 @@ export class RichPresence {
 			this.presence = presence;
 		}
 		if (this.available) {
+			console.log(this.presence);
 			this.client.setActivity(this.presence);
 		}
 	}
@@ -112,11 +113,10 @@ export default (
 		presence: new RichPresence({
 			details: "Starting...",
 			startTimestamp: Date.now(),
-			largeImageKey: "ios",
+			largeImageKey: "icon",
 			largeImageText: "Sombian#7940",
 			smallImageKey: "discord",
 			smallImageText: "discord.gg/Gp7tWCe",
-			partyId: "https://github.com/Any-Material",
 			instance: true
 		})
 	})

@@ -16,7 +16,6 @@ import { GalleryBlock } from "@/modules/hitomi.la/gallery";
 // states
 import bookmark from "@/states/bookmark";
 import navigation, { NavigationState, Viewport } from "@/states/navigation";
-import worker from "@/states/worker";
 
 const _Censorship = new RegExp(`(${["guro", "ryona", "snuff", "blood", "torture", "amputee", "cannibalism"].join("|")})`);
 
@@ -53,7 +52,7 @@ export class Gallery extends React.Component<GalleryProps, GalleryState> {
 		};
 	}
 	public wrap<T>(content: Array<T> | T) {
-		return content instanceof Array ? content : [content];
+		return (content instanceof Array ? content : [content]).filter((value) => { return value !== undefined; });
 	}
 	public censorship() {
 		for (const tag of this.props.options.gallery.tags ?? []) {
@@ -70,7 +69,7 @@ export class Gallery extends React.Component<GalleryProps, GalleryState> {
 		return (
 			<section data-component="gallery" id={this.props.id} class={inline({ [this.state.display]: true, "contrast": true, ...this.props.class })}>
 				<section id="upper" class="contrast">
-					<LazyLoad class={{ "censorship": this.censorship() }} options={{ source: this.props.options.gallery.thumbnail[0] }}></LazyLoad>
+					<LazyLoad class={{ "censorship": settings.state.gallery.censorship && this.censorship() }} options={{ source: this.props.options.gallery.thumbnail[0] }}></LazyLoad>
 					<section id="discovery" class="fluid">
 						<section id="buttons">
 							<Button class={{ "contrast": true }}
@@ -83,35 +82,40 @@ export class Gallery extends React.Component<GalleryProps, GalleryState> {
 						</section>
 						<section id="scrollable" class="scroll-y">
 							{(() => {
-								if (this.state.display === GalleryDisplay.TITLE) return;
-								return (
-									settings.state.gallery.discovery.map((key, index) => {
-										if (!this.props.options.gallery[key as keyof GalleryBlock]) return;
-										return (
-											<legend id="bundle" key={index}>
-												{key}:
-												{(this.wrap(this.props.options.gallery[key as keyof GalleryBlock]) as Array<string>).map((value, index) => {
-													const tag = {
-														key: key === "tags" ? /♂/.test(value) ? "male" : /♀/.test(value) ? "female" : "tag" : key,
-														value: key === "language" ? Object.keys(language)[Object.values(language).index(value)] : value
-													};
-													return (
-														<Button id="key" class={{ "contrast": true, "center": true, "censorship": typeof value === "string" ? _Censorship.test(value) : false }} key={index}
-															handler={{
-																click: (button) => {
-																	this.props.handler?.click(button, tag.key, tag.value.replace(/♂|♀/, "").replace(/^\s|\s$/g, "").replace(/\s+/g, "_"));
-																}
-															}}>
-															<legend id="value" class="eclipse center-x">
-																{key === "tags" ? <><strong id="field" class={tag.key}>{tag.key}</strong>:<>{tag.value.replace(/♂|♀/, "").replace(/^\s|\s$/g, "").replace(/\s+/g, "_")}</></> : tag.value}
-															</legend>
-														</Button>
-													);
-												})}
-											</legend>
-										);
-									})
-								)
+								switch (this.state.display) {
+									case GalleryDisplay.INFORMATION: {
+										return (settings.state.gallery.discovery.map((key, index) => {
+											// cache
+											const attributes = this.wrap(this.props.options.gallery[key as keyof GalleryBlock]) as Array<string>;
+												
+											if (attributes.length) {
+												return (
+													<legend id="bundle" key={index}>
+														{key}:
+														{attributes.map((value, index) => {
+															const tag = {
+																key: key === "tags" ? /♂/.test(value) ? "male" : /♀/.test(value) ? "female" : "tag" : key,
+																value: key === "language" ? Object.keys(language)[Object.values(language).match(value)] : value
+															};
+															return (
+																<Button id="key" class={{ "contrast": true, "center": true, "censorship": _Censorship.test(value) }} key={index}
+																	handler={{
+																		click: (button) => {
+																			this.props.handler?.click(button, tag.key, tag.value.replace(/♂|♀/, "").replace(/^\s|\s$/g, "").replace(/\s+/g, "_"));
+																		}
+																	}}>
+																	<legend id="value" class="eclipse center-x">
+																		{key === "tags" ? <><strong id="field" class={tag.key}>{tag.key}</strong>:<>{tag.value.replace(/♂|♀/, "").replace(/^\s|\s$/g, "").replace(/\s+/g, "_")}</></> : tag.value}
+																	</legend>
+																</Button>
+															);
+														})}
+													</legend>
+												);
+											}
+										}));
+									}
+								}
 							})()}
 						</section>
 					</section>

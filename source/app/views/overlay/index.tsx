@@ -54,7 +54,7 @@ export class Overlay extends React.Component<OverlayProps> {
 								for (const id of galleries.list) {
 									download.download(id).then(() => {
 										count++;
-										this.refer.terminal.current?.write([{ value: `Created (${count}/${galleries.length})` }]);
+										this.refer.terminal.current?.write([{ value: `Finished (${count}/${galleries.length})` }]);
 									});
 								}
 							});

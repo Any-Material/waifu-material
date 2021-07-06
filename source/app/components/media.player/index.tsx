@@ -58,7 +58,7 @@ export class MediaPlayer extends React.Component<MediaProps, MediaState> {
 				<section id="scrollable" class="scroll-y">
 					{this.props.options.files.map((file, index) => {
 						return (
-							<LazyLoad options={{ source: file }} class={{ "contrast": true }} key={index}></LazyLoad>
+							<LazyLoad options={{ source: file }} key={index}></LazyLoad>
 						);
 					})}
 				</section>

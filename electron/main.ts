@@ -36,6 +36,8 @@ app.on("ready", () => {
 			window.reload();
 		});
 	}
+	// clear cache
+	session.defaultSession.clearStorageData();
 	// bypass origin policy
 	session.defaultSession.webRequest.onBeforeSendHeaders({ urls: ["*://*.hitomi.la/*"] }, (details, callback) => {
 		details.requestHeaders["referer"] = "https://hitomi.la/";

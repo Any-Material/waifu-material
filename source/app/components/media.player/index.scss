@@ -16,12 +16,6 @@
 			min-width: 535px;
 			max-width: 100%;
 			background-color: var(--colour_3);
-			&.contrast {
-				border-top-width: 0px;
-			}
-			&:last-child {
-				border-bottom-width: 0px;
-			}
 		}
 	}
 	> #navigation {

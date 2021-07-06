@@ -36,7 +36,7 @@ declare global {
 		skip(count: number): Array<T>;
 		take(count: number): Array<T>;
 		add(...args: T[]): Array<T>;
-		index(element: T): number;
+		match(element: T): number;
 		contains(element: T): boolean;
 		/**
 		 * @deprecated

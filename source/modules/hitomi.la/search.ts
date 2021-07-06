@@ -62,7 +62,8 @@ export class Search {
 							return result;
 						}
 						default: {
-							throw new RangeError(`status code should either be 200 or 206, but received ${response.status.code}`);
+							// throw new RangeError(`status code should either be 200 or 206, but received ${response.status.code}`);
+							return [];
 						}
 					}
 				}

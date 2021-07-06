@@ -6,10 +6,10 @@
 	},
 	"search": {
 		"query": "",
-		"per_page": 25
+		"limit": 25
 	},
 	"storage": {
-		"auto_save": 300000
+		"period": 300000
 	},
 	"download": {
 		"directory": "./downloads",

@@ -28,7 +28,7 @@ Array.prototype.add = function <T>(...args: T[]) {
 	return this;
 }
 
-Array.prototype.index = function <T>(element: T) {
+Array.prototype.match = function <T>(element: T) {
 	for (let index = 0; index < this.length; index++) {
 		if (this[index] === element) {
 			return index;
@@ -38,7 +38,7 @@ Array.prototype.index = function <T>(element: T) {
 }
 
 Array.prototype.contains = function <T>(element: T) {
-	return !isNaN(this.index(element));
+	return !isNaN(this.match(element));
 }
 
 ArrayBuffer.prototype.skip = function (count: number) {

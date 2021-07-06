@@ -2,7 +2,7 @@ export class Request {
 	/**
 	 * @see https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest/Using_XMLHttpRequest
 	 */
-	public async send(args: RequestOptions, progress?: (chunk: any, progress: ProgressEvent<XMLHttpRequestEventTarget>) => void) {
+	public async send(args: RequestOptions, progress?: (chunk: any, xhr: ProgressEvent<XMLHttpRequestEventTarget>) => void) {
 		return new Promise<RequestResponse>((resolve, reject) => {
 			const http = {
 				xhr: new XMLHttpRequest(),
@@ -17,7 +17,7 @@ export class Request {
 			for (const key of Object.keys(args.partial.headers ?? {})) {
 				http.xhr.setRequestHeader(key, args.partial.headers![key]);
 			}
-			http.xhr.addEventListener("readystatechange", (ev) => {
+			http.xhr.addEventListener("readystatechange", () => {
 				if (http.xhr.readyState === http.xhr.HEADERS_RECEIVED) {
 					/**
 					 * @see https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest/getAllResponseHeaders
@@ -58,11 +58,11 @@ export class Request {
 					headers: http.headers
 				}));
 			});
-			http.xhr.addEventListener("progress", (progression) => {
+			http.xhr.addEventListener("progress", (event) => {
 				if (http.xhr.response && progress) {
 					switch (args.request.type) {
 						case "arraybuffer": {
-							progress((http.xhr.response as ArrayBuffer).skip(http.index), progression);
+							progress((http.xhr.response as ArrayBuffer).skip(http.index), event);
 							http.index = (http.xhr.response as ArrayBuffer).byteLength;
 							break;
 						}
@@ -91,19 +91,19 @@ export class Request {
 			http.xhr.send();
 		});
 	}
-	public GET(url: string, args?: { type?: XMLHttpRequestResponseType, headers?: Record<string, string>, progress?: (chunk: any, progress: ProgressEvent<XMLHttpRequestEventTarget>) => void }) {
+	public GET(url: string, args?: { type?: XMLHttpRequestResponseType, headers?: Record<string, string>, progress?: (chunk: any, xhr: ProgressEvent<XMLHttpRequestEventTarget>) => void }) {
 		return this.send(new RequestOptions({ request: { url: url, type: args?.type ?? "text", method: "GET" }, partial: { headers: args?.headers, max_redirects: 10 }, private: { redirects: 0 } }), args?.progress);
 	}
-	public PUT(url: string, args?: { type?: XMLHttpRequestResponseType, headers?: Record<string, string>, progress?: (chunk: any, progress: ProgressEvent<XMLHttpRequestEventTarget>) => void }) {
+	public PUT(url: string, args?: { type?: XMLHttpRequestResponseType, headers?: Record<string, string>, progress?: (chunk: any, xhr: ProgressEvent<XMLHttpRequestEventTarget>) => void }) {
 		return this.send(new RequestOptions({ request: { url: url, type: args?.type ?? "text", method: "PUT" }, partial: { headers: args?.headers, max_redirects: 10 }, private: { redirects: 0 } }), args?.progress);
 	}
-	public POST(url: string, args?: { type?: XMLHttpRequestResponseType, headers?: Record<string, string>, progress?: (chunk: any, progress: ProgressEvent<XMLHttpRequestEventTarget>) => void }) {
+	public POST(url: string, args?: { type?: XMLHttpRequestResponseType, headers?: Record<string, string>, progress?: (chunk: any, xhr: ProgressEvent<XMLHttpRequestEventTarget>) => void }) {
 		return this.send(new RequestOptions({ request: { url: url, type: args?.type ?? "text", method: "POST" }, partial: { headers: args?.headers, max_redirects: 10 }, private: { redirects: 0 } }), args?.progress);
 	}
-	public DELETE(url: string, args?: { type?: XMLHttpRequestResponseType, headers?: Record<string, string>, progress?: (chunk: any, progress: ProgressEvent<XMLHttpRequestEventTarget>) => void }) {
+	public DELETE(url: string, args?: { type?: XMLHttpRequestResponseType, headers?: Record<string, string>, progress?: (chunk: any, xhr: ProgressEvent<XMLHttpRequestEventTarget>) => void }) {
 		return this.send(new RequestOptions({ request: { url: url, type: args?.type ?? "text", method: "DELETE" }, partial: { headers: args?.headers, max_redirects: 10 }, private: { redirects: 0 } }), args?.progress);
 	}
-	public HEAD(url: string, args?: { type?: XMLHttpRequestResponseType, headers?: Record<string, string>, progress?: (chunk: any, progress: ProgressEvent<XMLHttpRequestEventTarget>) => void }) {
+	public HEAD(url: string, args?: { type?: XMLHttpRequestResponseType, headers?: Record<string, string>, progress?: (chunk: any, xhr: ProgressEvent<XMLHttpRequestEventTarget>) => void }) {
 		return this.send(new RequestOptions({ request: { url: url, type: args?.type ?? "text", method: "HEAD" }, partial: { headers: args?.headers, max_redirects: 10 }, private: { redirects: 0 } }), args?.progress);
 	}
 }

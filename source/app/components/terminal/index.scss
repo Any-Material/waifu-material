@@ -1,20 +1,9 @@
 [data-viewport="terminal"] {
 	display: grid;
 	grid-template-areas:
-	"indexing history";
+	"history";
 	grid-template-rows: 1fr;
-	grid-template-columns: auto 1fr;
-	> #indexing {
-		grid-area: indexing;
-		border-width: 0px;
-		border-right-width: thin;
-		background-color: var(--colour_3);
-		> legend {
-			width: 25px;
-			height: 25px;
-			color: var(--colour_9);
-		}
-	}
+	grid-template-columns: 1fr;
 	> #history {
 		grid-area: history;
 		> * {

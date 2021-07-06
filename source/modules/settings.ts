@@ -28,10 +28,10 @@ export class Config {
 	};
 	public search: {
 		query: string;
-		per_page: number;
+		limit: number;
 	};
 	public storage: {
-		auto_save: number;
+		period: number;
 	};
 	public download: {
 		directory: string;
